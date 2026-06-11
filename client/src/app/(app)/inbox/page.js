@@ -1,0 +1,148 @@
+'use client';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  Mail, Calendar, DollarSign, FileText, Clock, Receipt, ShieldCheck, Package,
+  Users, UserCog, Settings, Check, X, Inbox as InboxIcon,
+} from 'lucide-react';
+import PageBanner from '@/components/PageBanner';
+import Loader from '@/components/Loader';
+import { StatusBadge } from '@/components/ui';
+import { useAuth } from '@/context/AuthContext';
+import { leaves as leaveApi } from '@/lib/db';
+import { cls, initials } from '@/lib/format';
+
+const MODULES = [
+  { key: 'leaves', label: 'Leaves', icon: Calendar, live: true },
+  { key: 'rollover', label: 'Leave rollover', icon: DollarSign },
+  { key: 'compoff', label: 'Comp off request', icon: FileText },
+  { key: 'timesheet', label: 'Timesheet', icon: Clock },
+  { key: 'expenses', label: 'Expenses & reimbursement', icon: Receipt },
+  { key: 'investments', label: 'Proof of investments', icon: ShieldCheck },
+  { key: 'assets', label: 'Assets', icon: Package },
+  { key: 'employees', label: 'Employees', icon: Users },
+  { key: 'delegation', label: 'Delegation', icon: UserCog },
+  { key: 'attendance', label: 'Attendance tracker', icon: Calendar },
+  { key: 'delegationSettings', label: 'Delegation settings', icon: Settings },
+];
+const TABS = [['mine', 'My requests'], ['await', 'Awaiting approval'], ['done', 'Completed']];
+const fmt = (d) => d ? new Date(d).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+const ago = (d) => {
+  const diff = (Date.now() - new Date(d).getTime()) / 86400000;
+  if (diff < 1) return 'today'; if (diff < 2) return 'yesterday';
+  if (diff < 30) return `${Math.floor(diff)} days ago`;
+  return `${Math.floor(diff / 30)} month(s) ago`;
+};
+
+export default function InboxPage() {
+  const { user } = useAuth();
+  const canDecide = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR', 'MANAGER'].includes(user?.role);
+  const [module, setModule] = useState('leaves');
+  const [tab, setTab] = useState('mine');
+  const [all, setAll] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [sel, setSel] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setAll(await leaveApi.list()); } catch { /* ignore */ } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const mineCode = user?.employeeCode;
+  const list = module !== 'leaves' ? [] : all.filter((l) => {
+    if (tab === 'mine') return l.employee?.employeeId === mineCode || !mineCode;
+    if (tab === 'await') return l.status === 'PENDING';
+    return l.status === 'APPROVED' || l.status === 'REJECTED';
+  });
+
+  const decide = async (id, decision) => {
+    try { await leaveApi.decide(id, decision); setSel(null); load(); }
+    catch (e) { alert(e.message || 'Action failed'); }
+  };
+
+  return (
+    <>
+      <PageBanner icon={Mail} title="Inbox" />
+      <div className="grid gap-4 lg:grid-cols-[230px_1fr]">
+        {/* module rail */}
+        <div className="card h-fit overflow-hidden p-1.5">
+          {MODULES.map((m) => (
+            <button key={m.key} onClick={() => { setModule(m.key); setSel(null); }}
+              className={cls('flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition',
+                module === m.key ? 'bg-sky-500 font-medium text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800')}>
+              <m.icon size={16} /> <span className="flex-1 truncate">{m.label}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* content */}
+        <div className="card overflow-hidden">
+          <div className="flex gap-6 border-b px-5 pt-3">
+            {TABS.map(([k, label]) => (
+              <button key={k} onClick={() => { setTab(k); setSel(null); }}
+                className={cls('border-b-2 pb-3 text-sm font-medium transition', tab === k ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200')}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid md:grid-cols-2">
+            <div className="border-r">
+              {loading ? <Loader /> : list.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-16 text-slate-400">
+                  <InboxIcon size={28} /><span className="text-sm">No requests here.</span>
+                </div>
+              ) : list.map((l) => (
+                <button key={l._id} onClick={() => setSel(l)} className={cls('block w-full border-b px-5 py-4 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/40', sel?._id === l._id && 'bg-sky-50 dark:bg-sky-950/30')}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="grid h-8 w-8 place-items-center rounded-full bg-orange-500 text-xs font-semibold text-white">{initials(`${l.employee?.firstName || ''} ${l.employee?.lastName || ''}`)}</div>
+                      <span className="font-medium">{l.employee?.firstName} {l.employee?.lastName}</span>
+                    </div>
+                    <span className="text-xs text-slate-400">{ago(l.from)}</span>
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between pl-10 text-sm">
+                    <span className="text-slate-500">Requested for {fmt(l.from)}</span>
+                    <StatusBadge status={l.status} />
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* detail */}
+            <div className="hidden md:block">
+              {!sel ? (
+                <div className="flex h-full min-h-[300px] flex-col items-center justify-center gap-3 text-slate-300">
+                  <div className="grid h-20 w-20 place-items-center rounded-full bg-sky-100 text-sky-500 dark:bg-sky-950/40"><Mail size={34} /></div>
+                  <span className="text-lg text-slate-400">Select a message to read</span>
+                </div>
+              ) : (
+                <div className="p-6">
+                  <div className="mb-4 flex items-center gap-3">
+                    <div className="grid h-11 w-11 place-items-center rounded-full bg-orange-500 text-sm font-semibold text-white">{initials(`${sel.employee?.firstName || ''} ${sel.employee?.lastName || ''}`)}</div>
+                    <div>
+                      <div className="font-semibold">{sel.employee?.firstName} {sel.employee?.lastName}</div>
+                      <div className="text-xs text-slate-400">{sel.type} leave</div>
+                    </div>
+                  </div>
+                  <dl className="space-y-2 text-sm">
+                    <Row k="From" v={fmt(sel.from)} /><Row k="To" v={fmt(sel.to)} />
+                    <Row k="Days" v={`${sel.days} day(s)`} /><Row k="Reason" v={sel.reason || '—'} />
+                    <Row k="Status" v={<StatusBadge status={sel.status} />} />
+                  </dl>
+                  {canDecide && sel.status === 'PENDING' && (
+                    <div className="mt-5 flex gap-2">
+                      <button className="btn bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => decide(sel._id, 'APPROVED')}><Check size={16} /> Approve</button>
+                      <button className="btn-outline text-rose-600" onClick={() => decide(sel._id, 'REJECTED')}><X size={16} /> Reject</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+function Row({ k, v }) { return <div className="flex gap-3"><dt className="w-20 shrink-0 text-slate-400">{k}</dt><dd className="font-medium">{v}</dd></div>; }

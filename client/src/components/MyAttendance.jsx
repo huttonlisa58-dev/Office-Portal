@@ -1,0 +1,129 @@
+'use client';
+import { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Turtle, Hand, Flame } from 'lucide-react';
+import { attendance as attApi } from '@/lib/db';
+import Loader from '@/components/Loader';
+
+const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const fmtTime = (t) => t ? new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+const fmtDur = (m) => m ? `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00` : '—';
+
+const CODE = {
+  P: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+  A: 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300',
+  DO: 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
+  H: 'bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300',
+  '': 'text-slate-300',
+};
+
+export default function MyAttendance({ employeeId }) {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth());
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!employeeId) { setLoading(false); return; }
+    setLoading(true);
+    attApi.mine(employeeId, year, month).then(setData).catch(() => setData(null)).finally(() => setLoading(false));
+  }, [employeeId, year, month]);
+
+  const days = useMemo(() => new Date(Date.UTC(year, month + 1, 0)).getUTCDate(), [year, month]);
+  const todayStr = now.toISOString().slice(0, 10);
+
+  const cells = useMemo(() => {
+    const byDate = new Map();
+    (data?.rows || []).forEach((r) => byDate.set(r.date, r));
+    const hol = new Set(data?.holidays || []);
+    const out = [];
+    for (let d = 1; d <= days; d++) {
+      const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dow = new Date(Date.UTC(year, month, d)).getUTCDay();
+      const weekend = dow === 0 || dow === 6;
+      const rec = byDate.get(date);
+      let code = '';
+      if (hol.has(date)) code = 'H';
+      else if (rec && ['PRESENT', 'LATE', 'HALF_DAY'].includes(rec.status)) code = 'P';
+      else if (weekend) code = 'DO';
+      else if (date < todayStr) code = 'A';
+      out.push({ d, date, dow, code, late: rec?.isLate, manual: rec?.checkIn?.method === 'MANUAL', ot: rec?.overtimeMinutes > 0 });
+    }
+    return out;
+  }, [data, days, year, month, todayStr]);
+
+  const firstLast = useMemo(() => (data?.rows || []).filter((r) => r.checkIn).map((r) => ({
+    date: r.date, first: r.checkIn?.time, last: r.checkOut?.time, total: r.workedMinutes,
+  })).reverse(), [data]);
+
+  const go = (delta) => { let m = month + delta, y = year; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } setMonth(m); setYear(y); };
+
+  if (!employeeId) return <div className="card p-10 text-center text-sm text-slate-400">Your account isn&apos;t linked to an employee record, so personal attendance isn&apos;t available.</div>;
+
+  return (
+    <>
+      <div className="card mb-6 overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3">
+          <div className="font-semibold">Attendance details</div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => go(-1)} className="btn-ghost p-1.5"><ChevronLeft size={16} /></button>
+            <span className="min-w-[150px] text-center text-sm font-medium">1 {MONTHS[month].slice(0, 3)} {year} – {days} {MONTHS[month].slice(0, 3)} {year}</span>
+            <button onClick={() => go(1)} className="btn-ghost p-1.5"><ChevronRight size={16} /></button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-4 px-5 py-2 text-xs text-slate-500">
+          <span className="inline-flex items-center gap-1"><Turtle size={14} className="text-rose-500" /> Late entry</span>
+          <span className="inline-flex items-center gap-1"><Hand size={14} className="text-sky-500" /> Manual entry</span>
+          <span className="inline-flex items-center gap-1"><Flame size={14} className="text-orange-500" /> OT (Overtime)</span>
+          <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-rose-400" /> Pending</span>
+        </div>
+        {loading ? <Loader /> : (
+          <div className="overflow-x-auto px-3 pb-4">
+            <div className="flex">
+              {cells.map((c) => (
+                <div key={c.d} className="min-w-[58px] border-l first:border-l-0">
+                  <div className={`px-1 py-2 text-center ${c.dow === 0 || c.dow === 6 ? 'bg-slate-50 dark:bg-slate-800/50' : ''}`}>
+                    <div className="text-[11px] font-medium text-slate-500">{WD[c.dow]}</div>
+                    <div className="text-[10px] text-slate-400">{MONTHS[month].slice(0, 3)} {String(c.d).padStart(2, '0')}</div>
+                  </div>
+                  <div className={`grid h-12 place-items-center text-xs font-bold ${CODE[c.code] || ''}`}>
+                    <div>{c.code}</div>
+                    <div className="flex gap-0.5">
+                      {c.late && <Turtle size={11} className="text-rose-500" />}
+                      {c.manual && <Hand size={11} className="text-sky-500" />}
+                      {c.ot && <Flame size={11} className="text-orange-500" />}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card overflow-hidden">
+        <div className="border-b px-5 py-3 font-semibold">First in / Last out</div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b text-left text-slate-400">
+              <th className="px-5 py-3 font-medium">Date</th><th className="px-5 py-3 font-medium">First in</th>
+              <th className="px-5 py-3 font-medium">Last out</th><th className="px-5 py-3 font-medium">Total in-time</th>
+            </tr></thead>
+            <tbody>
+              {firstLast.length === 0 && <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-400">No punches this month.</td></tr>}
+              {firstLast.map((r) => (
+                <tr key={r.date} className="border-b last:border-0">
+                  <td className="px-5 py-3 font-medium">{new Date(r.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                  <td className="px-5 py-3 text-slate-500">{fmtTime(r.first)}</td>
+                  <td className="px-5 py-3 text-slate-500">{fmtTime(r.last)}</td>
+                  <td className="px-5 py-3 text-slate-500">{fmtDur(r.total)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+}

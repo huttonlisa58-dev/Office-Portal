@@ -1,0 +1,27 @@
+import { Router } from 'express';
+import auth from './auth.routes.js';
+import company from './company.routes.js';
+import employee from './employee.routes.js';
+import org from './org.routes.js';
+import attendance from './attendance.routes.js';
+import leave from './leave.routes.js';
+import payroll from './payroll.routes.js';
+import task from './task.routes.js';
+import dashboard from './dashboard.routes.js';
+import notification from './notification.routes.js';
+import ai from './ai.routes.js';
+
+const api = Router();
+api.get('/health', (req, res) => res.json({ success: true, status: 'ok', ts: Date.now() }));
+api.use('/auth', auth);
+api.use('/companies', company);
+api.use('/employees', employee);
+api.use('/org', org);
+api.use('/attendance', attendance);
+api.use('/leaves', leave);
+api.use('/payroll', payroll);
+api.use('/tasks', task);
+api.use('/dashboard', dashboard);
+api.use('/notifications', notification);
+api.use('/ai', ai);
+export default api;

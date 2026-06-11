@@ -1,0 +1,15 @@
+# Supabase project config (reference). Live project ref: knrgexuoewfywknuytos
+project_id = "knrgexuoewfywknuytos"
+
+[functions.twilio-otp]
+verify_jwt = true
+[functions.attendance-punch]
+verify_jwt = true
+[functions.leave-decision]
+verify_jwt = true
+[functions.payroll-generate]
+verify_jwt = true
+[functions.create-employee]
+verify_jwt = true
+[functions.ai-assistant]
+verify_jwt = true
