@@ -11,6 +11,14 @@ import { employees as empApi, org } from '@/lib/db';
 const AVA = ['bg-orange-500', 'bg-sky-500', 'bg-violet-500', 'bg-emerald-500', 'bg-rose-500', 'bg-amber-500'];
 const col = (s = '') => AVA[(s.charCodeAt(0) || 0) % AVA.length];
 
+const GENDERS = ['Male', 'Female', 'Other'];
+const BLOODS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
+const MARITALS = ['Single', 'Married', 'Divorced', 'Widowed'];
+const EMP_TYPES = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERN', 'PERMANENT'];
+const STATUSES = ['ACTIVE', 'INACTIVE', 'TERMINATED'];
+const SectionLabel = ({ children }) => <div className="border-t pt-3 text-xs font-semibold uppercase tracking-wide text-slate-400 dark:border-slate-700">{children}</div>;
+const Fld = ({ label, req, children }) => <div><label className="label">{label}{req && <span className="text-rose-400"> *</span>}</label>{children}</div>;
+
 export default function EmployeesPage() {
   const { user } = useAuth();
   const canManage = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR'].includes(user?.role);
@@ -150,26 +158,45 @@ function CredRow({ label, value }) {
 }
 
 function AddEmployee({ open, onClose, user, onDone }) {
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '' });
-  const [depts, setDepts] = useState([]); const [desigs, setDesigs] = useState([]);
-  const [deptId, setDeptId] = useState(''); const [desigId, setDesigId] = useState('');
+  const empty = {
+    firstName: '', middleName: '', lastName: '', nickName: '', email: '', password: '',
+    phone: '', gender: '', dob: '', bloodGroup: '', maritalStatus: '', smoker: 'No', address: '',
+    employmentType: 'FULL_TIME', status: 'ACTIVE', dateOfJoining: '',
+  };
+  const [form, setForm] = useState(empty);
+  const [depts, setDepts] = useState([]); const [desigs, setDesigs] = useState([]); const [mgrs, setMgrs] = useState([]);
+  const [deptId, setDeptId] = useState(''); const [desigId, setDesigId] = useState(''); const [managerId, setManagerId] = useState('');
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState(null);
-  useEffect(() => { if (open) { org.departments().then(setDepts); org.designations().then(setDesigs); setCreated(null); setErr(''); } }, [open]);
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  useEffect(() => {
+    if (open) {
+      org.departments().then(setDepts); org.designations().then(setDesigs); empApi.all().then(setMgrs).catch(() => {});
+      setCreated(null); setErr('');
+    }
+  }, [open]);
 
   const submit = async () => {
     setErr(''); setBusy(true);
     try {
-      const res = await empApi.create({ first_name: form.firstName, last_name: form.lastName, email: form.email, password: form.password || undefined, department_id: deptId || null, designation_id: desigId || null });
+      const res = await empApi.create({
+        first_name: form.firstName, middle_name: form.middleName || null, last_name: form.lastName, nick_name: form.nickName || null,
+        email: form.email, password: form.password || undefined,
+        phone: form.phone || null, gender: form.gender || null, dob: form.dob || null,
+        blood_group: form.bloodGroup || null, marital_status: form.maritalStatus || null, smoker: form.smoker === 'Yes',
+        address: form.address || null, date_of_joining: form.dateOfJoining || null,
+        department_id: deptId || null, designation_id: desigId || null, manager_id: managerId || null,
+        employment_type: form.employmentType, status: form.status,
+      });
       setCreated({ code: res.employee?.employee_code, login: res.login, warning: res.warning });
-      setForm({ firstName: '', lastName: '', email: '', password: '' }); setDeptId(''); setDesigId('');
+      setForm(empty); setDeptId(''); setDesigId(''); setManagerId('');
       onDone();
     } catch (e) { setErr(e.message || 'Could not create'); } finally { setBusy(false); }
   };
   const close = () => { setCreated(null); onClose(); };
 
   return (
-    <Modal open={open} onClose={close} title={created ? 'Employee created' : 'Add employee'}>
+    <Modal open={open} onClose={close} title={created ? 'Employee created' : 'Add employee'} width="max-w-2xl">
       {created ? (
         <div className="space-y-4">
           <div className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">✓ Employee <b>{created.code}</b> added.</div>
@@ -188,19 +215,41 @@ function AddEmployee({ open, onClose, user, onDone }) {
       ) : (
         <div className="space-y-3">
           {err && <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{err}</div>}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label className="label">First name</label><input className="input" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></div>
-            <div><label className="label">Last name</label><input className="input" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></div>
+
+          <SectionLabel>Basic details</SectionLabel>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Fld label="First name" req><input className="input" value={form.firstName} onChange={set('firstName')} /></Fld>
+            <Fld label="Middle name"><input className="input" value={form.middleName} onChange={set('middleName')} /></Fld>
+            <Fld label="Last name"><input className="input" value={form.lastName} onChange={set('lastName')} /></Fld>
+            <Fld label="Nick name"><input className="input" value={form.nickName} onChange={set('nickName')} /></Fld>
           </div>
-          <div><label className="label">Email (login ID)</label><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="employee@company.com" /></div>
-          <div><label className="label">Temporary password</label><input className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Defaults to Welcome@123" /><p className="mt-1 text-xs text-slate-400">Login auto-banta hai email se. Employee first login ke baad change kar sakta hai.</p></div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div><label className="label">Department</label><select className="input" value={deptId} onChange={(e) => setDeptId(e.target.value)}><option value="">—</option>{depts.map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}</select></div>
-            <div><label className="label">Designation</label><select className="input" value={desigId} onChange={(e) => setDesigId(e.target.value)}><option value="">—</option>{desigs.map((d) => <option key={d._id} value={d._id}>{d.title}</option>)}</select></div>
+          <Fld label="Email (login ID)"><input className="input" type="email" value={form.email} onChange={set('email')} placeholder="employee@company.com" /></Fld>
+          <Fld label="Temporary password"><input className="input" value={form.password} onChange={set('password')} placeholder="Defaults to Welcome@123" /><p className="mt-1 text-xs text-slate-400">Login auto-banta hai email se. Employee first login ke baad change kar sakta hai.</p></Fld>
+
+          <SectionLabel>Personal</SectionLabel>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Fld label="Gender"><select className="input" value={form.gender} onChange={set('gender')}><option value="">—</option>{GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}</select></Fld>
+            <Fld label="Date of birth"><input className="input" type="date" value={form.dob} onChange={set('dob')} /></Fld>
+            <Fld label="Blood group"><select className="input" value={form.bloodGroup} onChange={set('bloodGroup')}><option value="">—</option>{BLOODS.map((b) => <option key={b} value={b}>{b}</option>)}</select></Fld>
+            <Fld label="Marital status"><select className="input" value={form.maritalStatus} onChange={set('maritalStatus')}><option value="">—</option>{MARITALS.map((m) => <option key={m} value={m}>{m}</option>)}</select></Fld>
+            <Fld label="Smoker"><select className="input" value={form.smoker} onChange={set('smoker')}><option>No</option><option>Yes</option></select></Fld>
+            <Fld label="Phone"><input className="input" value={form.phone} onChange={set('phone')} placeholder="+91…" /></Fld>
           </div>
-          <div className="flex justify-end gap-2 pt-1">
+          <Fld label="Address"><textarea className="input" rows={2} value={form.address} onChange={set('address')} /></Fld>
+
+          <SectionLabel>Work</SectionLabel>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Fld label="Department"><select className="input" value={deptId} onChange={(e) => setDeptId(e.target.value)}><option value="">—</option>{depts.map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}</select></Fld>
+            <Fld label="Designation"><select className="input" value={desigId} onChange={(e) => setDesigId(e.target.value)}><option value="">—</option>{desigs.map((d) => <option key={d._id} value={d._id}>{d.title}</option>)}</select></Fld>
+            <Fld label="Reporting manager"><select className="input" value={managerId} onChange={(e) => setManagerId(e.target.value)}><option value="">—</option>{mgrs.map((m) => <option key={m._id} value={m._id}>{m.firstName} {m.lastName} ({m.employeeId})</option>)}</select></Fld>
+            <Fld label="Date of joining"><input className="input" type="date" value={form.dateOfJoining} onChange={set('dateOfJoining')} /></Fld>
+            <Fld label="Employment type"><select className="input" value={form.employmentType} onChange={set('employmentType')}>{EMP_TYPES.map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}</select></Fld>
+            <Fld label="Employee status"><select className="input" value={form.status} onChange={set('status')}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></Fld>
+          </div>
+
+          <div className="flex justify-end gap-2 border-t pt-3 dark:border-slate-700">
             <button className="btn-outline" onClick={close}>Cancel</button>
-            <button className="btn-primary" disabled={busy || !form.firstName} onClick={submit}>Create</button>
+            <button className="btn-primary" disabled={busy || !form.firstName} onClick={submit}>{busy ? 'Creating…' : 'Create'}</button>
           </div>
         </div>
       )}
@@ -211,57 +260,83 @@ function AddEmployee({ open, onClose, user, onDone }) {
 function EditEmployee({ emp, onClose, onDone }) {
   const open = !!emp;
   const [form, setForm] = useState({});
-  const [depts, setDepts] = useState([]); const [desigs, setDesigs] = useState([]);
-  const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  const [depts, setDepts] = useState([]); const [desigs, setDesigs] = useState([]); const [mgrs, setMgrs] = useState([]);
+  const [err, setErr] = useState(''); const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(false);
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   useEffect(() => {
-    if (emp) {
+    if (!emp) return;
+    setErr(''); setLoading(true);
+    org.departments().then(setDepts); org.designations().then(setDesigs); empApi.all().then(setMgrs).catch(() => {});
+    empApi.getOne(emp._id).then((d) => {
+      const e = d || emp;
       setForm({
-        firstName: emp.firstName || '', lastName: emp.lastName || '', phone: emp.phone || '',
-        employmentType: emp.employmentType || 'FULL_TIME', status: emp.status || 'ACTIVE',
-        deptId: emp.departmentId || '', desigId: emp.designationId || '',
+        firstName: e.firstName || '', middleName: e.middleName || '', lastName: e.lastName || '', nickName: e.nickName || '',
+        phone: e.phone || '', gender: e.gender || '', dob: e.dob || '', bloodGroup: e.bloodGroup || '',
+        maritalStatus: e.maritalStatus || '', smoker: e.smoker ? 'Yes' : 'No', address: e.address || '',
+        employmentType: e.employmentType || 'FULL_TIME', status: e.status || 'ACTIVE',
+        dateOfJoining: e.dateOfJoining || '', deptId: e.departmentId || '', desigId: e.designationId || '', managerId: '',
       });
-      setErr('');
-      org.departments().then(setDepts); org.designations().then(setDesigs);
-    }
+    }).catch(() => {}).finally(() => setLoading(false));
   }, [emp]);
 
   const save = async () => {
     setErr(''); setBusy(true);
     try {
       await empApi.update(emp._id, {
-        first_name: form.firstName, last_name: form.lastName, phone: form.phone || null,
+        first_name: form.firstName, middle_name: form.middleName || null, last_name: form.lastName, nick_name: form.nickName || null,
+        phone: form.phone || null, gender: form.gender || null, dob: form.dob || null,
+        blood_group: form.bloodGroup || null, marital_status: form.maritalStatus || null, smoker: form.smoker === 'Yes',
+        address: form.address || null, date_of_joining: form.dateOfJoining || null,
         employment_type: form.employmentType, status: form.status,
         department_id: form.deptId || null, designation_id: form.desigId || null,
+        ...(form.managerId ? { manager_id: form.managerId } : {}),
       });
       onClose(); onDone();
     } catch (e) { setErr(e.message || 'Could not save'); } finally { setBusy(false); }
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={`Edit ${emp?.firstName || 'employee'}`}>
+    <Modal open={open} onClose={onClose} title={`Edit ${emp?.firstName || 'employee'}`} width="max-w-2xl">
+      {loading ? <Loader /> : (
       <div className="space-y-3">
         {err && <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{err}</div>}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div><label className="label">First name</label><input className="input" value={form.firstName || ''} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></div>
-          <div><label className="label">Last name</label><input className="input" value={form.lastName || ''} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></div>
+
+        <SectionLabel>Basic details</SectionLabel>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Fld label="First name" req><input className="input" value={form.firstName || ''} onChange={set('firstName')} /></Fld>
+          <Fld label="Middle name"><input className="input" value={form.middleName || ''} onChange={set('middleName')} /></Fld>
+          <Fld label="Last name"><input className="input" value={form.lastName || ''} onChange={set('lastName')} /></Fld>
+          <Fld label="Nick name"><input className="input" value={form.nickName || ''} onChange={set('nickName')} /></Fld>
+          <Fld label="Email (login ID)"><input className="input bg-slate-50 dark:bg-slate-800" value={emp?.email || ''} disabled title="Login email can't be changed here" /></Fld>
+          <Fld label="Phone"><input className="input" value={form.phone || ''} onChange={set('phone')} placeholder="+91…" /></Fld>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div><label className="label">Email (login ID)</label><input className="input bg-slate-50 dark:bg-slate-800" value={emp?.email || ''} disabled title="Login email can't be changed here" /></div>
-          <div><label className="label">Phone</label><input className="input" value={form.phone || ''} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+91…" /></div>
+
+        <SectionLabel>Personal</SectionLabel>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Fld label="Gender"><select className="input" value={form.gender || ''} onChange={set('gender')}><option value="">—</option>{GENDERS.map((g) => <option key={g} value={g}>{g}</option>)}</select></Fld>
+          <Fld label="Date of birth"><input className="input" type="date" value={form.dob || ''} onChange={set('dob')} /></Fld>
+          <Fld label="Blood group"><select className="input" value={form.bloodGroup || ''} onChange={set('bloodGroup')}><option value="">—</option>{BLOODS.map((b) => <option key={b} value={b}>{b}</option>)}</select></Fld>
+          <Fld label="Marital status"><select className="input" value={form.maritalStatus || ''} onChange={set('maritalStatus')}><option value="">—</option>{MARITALS.map((m) => <option key={m} value={m}>{m}</option>)}</select></Fld>
+          <Fld label="Smoker"><select className="input" value={form.smoker || 'No'} onChange={set('smoker')}><option>No</option><option>Yes</option></select></Fld>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div><label className="label">Department</label><select className="input" value={form.deptId || ''} onChange={(e) => setForm({ ...form, deptId: e.target.value })}><option value="">—</option>{depts.map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}</select></div>
-          <div><label className="label">Designation</label><select className="input" value={form.desigId || ''} onChange={(e) => setForm({ ...form, desigId: e.target.value })}><option value="">—</option>{desigs.map((d) => <option key={d._id} value={d._id}>{d.title}</option>)}</select></div>
+        <Fld label="Address"><textarea className="input" rows={2} value={form.address || ''} onChange={set('address')} /></Fld>
+
+        <SectionLabel>Work</SectionLabel>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Fld label="Department"><select className="input" value={form.deptId || ''} onChange={set('deptId')}><option value="">—</option>{depts.map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}</select></Fld>
+          <Fld label="Designation"><select className="input" value={form.desigId || ''} onChange={set('desigId')}><option value="">—</option>{desigs.map((d) => <option key={d._id} value={d._id}>{d.title}</option>)}</select></Fld>
+          <Fld label="Reporting manager"><select className="input" value={form.managerId || ''} onChange={set('managerId')}><option value="">— keep current —</option>{mgrs.filter((m) => m._id !== emp?._id).map((m) => <option key={m._id} value={m._id}>{m.firstName} {m.lastName} ({m.employeeId})</option>)}</select></Fld>
+          <Fld label="Date of joining"><input className="input" type="date" value={form.dateOfJoining || ''} onChange={set('dateOfJoining')} /></Fld>
+          <Fld label="Employment type"><select className="input" value={form.employmentType || 'FULL_TIME'} onChange={set('employmentType')}>{EMP_TYPES.map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}</select></Fld>
+          <Fld label="Employee status"><select className="input" value={form.status || 'ACTIVE'} onChange={set('status')}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></Fld>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div><label className="label">Employment type</label><select className="input" value={form.employmentType || 'FULL_TIME'} onChange={(e) => setForm({ ...form, employmentType: e.target.value })}>{['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERN', 'PERMANENT'].map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}</select></div>
-          <div><label className="label">Status</label><select className="input" value={form.status || 'ACTIVE'} onChange={(e) => setForm({ ...form, status: e.target.value })}>{['ACTIVE', 'INACTIVE', 'TERMINATED'].map((s) => <option key={s} value={s}>{s}</option>)}</select></div>
-        </div>
-        <div className="flex justify-end gap-2 pt-1">
+
+        <div className="flex justify-end gap-2 border-t pt-3 dark:border-slate-700">
           <button className="btn-outline" onClick={onClose}>Cancel</button>
-          <button className="btn-primary" disabled={busy || !form.firstName} onClick={save}>Save changes</button>
+          <button className="btn-primary" disabled={busy || !form.firstName} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button>
         </div>
       </div>
+      )}
     </Modal>
   );
 }
