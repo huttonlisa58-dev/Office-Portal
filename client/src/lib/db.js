@@ -112,6 +112,19 @@ export const employees = {
     return { items: (data || []).map(mEmp), total: count || 0, page, pages: Math.max(1, Math.ceil((count || 0) / limit)) };
   },
   create: (payload) => invoke('create-employee', payload),
+  async getOne(id) {
+    if (!id) return null;
+    const { data } = await supabase.from('employees')
+      .select('*, department:departments(name), designation:designations(title), manager:employees!employees_manager_id_fkey(first_name,last_name,employee_code)')
+      .eq('id', id).maybeSingle();
+    if (!data) return null;
+    return {
+      ...mEmp(data),
+      dob: data.dob || null, gender: data.gender || null, address: data.address || null,
+      dateOfJoining: data.date_of_joining || null,
+      manager: data.manager ? { name: `${data.manager.first_name} ${data.manager.last_name || ''}`.trim(), code: data.manager.employee_code } : null,
+    };
+  },
   async update(id, patch) {
     const { data, error } = await supabase.from('employees').update(patch).eq('id', id)
       .select('*, department:departments(name), designation:designations(title)').single();
