@@ -145,13 +145,13 @@ function GeneratePayroll({ onClose, onSaved }) {
             {employees.map((e) => <option key={e._id} value={e._id}>{e.firstName} {e.lastName} ({e.employeeId})</option>)}
           </select>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className="label">Month</label>
             <select className="input" value={form.month} onChange={set('month')}>{MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select>
           </div>
           <div><label className="label">Year</label><input className="input" type="number" value={form.year} onChange={set('year')} /></div>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className="label">Bonus</label><input className="input" type="number" value={form.bonus} onChange={set('bonus')} /></div>
           <div><label className="label">Loss-of-pay days</label><input className="input" type="number" value={form.lopDays} onChange={set('lopDays')} /></div>
         </div>
@@ -226,7 +226,7 @@ function StructureEditor({ onClose }) {
         </div>
         {employeeId && (
           <>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div><label className="label">Basic salary</label><input className="input" type="number" value={form.basic} onChange={(e) => setForm((f) => ({ ...f, basic: e.target.value }))} /></div>
               <div><label className="label">Currency</label><select className="input" value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))}>{['INR', 'USD', 'EUR', 'GBP', 'AED', 'SGD', 'AUD', 'CAD'].map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
             </div>

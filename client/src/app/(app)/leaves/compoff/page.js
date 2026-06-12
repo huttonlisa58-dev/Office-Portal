@@ -81,7 +81,7 @@ function CompOffModal({ companyId, employeeId, onClose, onDone }) {
     <Modal open onClose={onClose} title="Request comp-off">
       <div className="space-y-3">
         {err && <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{err}</div>}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div><label className="label">Worked on (date)</label><input type="date" className="input" value={form.workedDate} onChange={(e) => setForm({ ...form, workedDate: e.target.value })} /></div>
           <div><label className="label">Days</label><input type="number" step="0.5" className="input" value={form.days} onChange={(e) => setForm({ ...form, days: e.target.value })} /></div>
         </div>

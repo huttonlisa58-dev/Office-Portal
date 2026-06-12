@@ -114,7 +114,7 @@ function CreateTask({ onClose, onSaved }) {
       <div className="grid gap-4">
         <div><label className="label">Title *</label><input className="input" value={form.title} onChange={set('title')} /></div>
         <div><label className="label">Description</label><textarea className="input" rows={3} value={form.description} onChange={set('description')} /></div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div><label className="label">Priority</label>
             <select className="input" value={form.priority} onChange={set('priority')}>{['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((p) => <option key={p}>{p}</option>)}</select>
           </div>

@@ -188,13 +188,13 @@ function AddEmployee({ open, onClose, user, onDone }) {
       ) : (
         <div className="space-y-3">
           {err && <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{err}</div>}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className="label">First name</label><input className="input" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></div>
             <div><label className="label">Last name</label><input className="input" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></div>
           </div>
           <div><label className="label">Email (login ID)</label><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="employee@company.com" /></div>
           <div><label className="label">Temporary password</label><input className="input" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Defaults to Welcome@123" /><p className="mt-1 text-xs text-slate-400">Login auto-banta hai email se. Employee first login ke baad change kar sakta hai.</p></div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div><label className="label">Department</label><select className="input" value={deptId} onChange={(e) => setDeptId(e.target.value)}><option value="">—</option>{depts.map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}</select></div>
             <div><label className="label">Designation</label><select className="input" value={desigId} onChange={(e) => setDesigId(e.target.value)}><option value="">—</option>{desigs.map((d) => <option key={d._id} value={d._id}>{d.title}</option>)}</select></div>
           </div>
@@ -241,19 +241,19 @@ function EditEmployee({ emp, onClose, onDone }) {
     <Modal open={open} onClose={onClose} title={`Edit ${emp?.firstName || 'employee'}`}>
       <div className="space-y-3">
         {err && <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{err}</div>}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div><label className="label">First name</label><input className="input" value={form.firstName || ''} onChange={(e) => setForm({ ...form, firstName: e.target.value })} /></div>
           <div><label className="label">Last name</label><input className="input" value={form.lastName || ''} onChange={(e) => setForm({ ...form, lastName: e.target.value })} /></div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div><label className="label">Email (login ID)</label><input className="input bg-slate-50 dark:bg-slate-800" value={emp?.email || ''} disabled title="Login email can't be changed here" /></div>
           <div><label className="label">Phone</label><input className="input" value={form.phone || ''} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+91…" /></div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div><label className="label">Department</label><select className="input" value={form.deptId || ''} onChange={(e) => setForm({ ...form, deptId: e.target.value })}><option value="">—</option>{depts.map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}</select></div>
           <div><label className="label">Designation</label><select className="input" value={form.desigId || ''} onChange={(e) => setForm({ ...form, desigId: e.target.value })}><option value="">—</option>{desigs.map((d) => <option key={d._id} value={d._id}>{d.title}</option>)}</select></div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div><label className="label">Employment type</label><select className="input" value={form.employmentType || 'FULL_TIME'} onChange={(e) => setForm({ ...form, employmentType: e.target.value })}>{['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERN', 'PERMANENT'].map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}</select></div>
           <div><label className="label">Status</label><select className="input" value={form.status || 'ACTIVE'} onChange={(e) => setForm({ ...form, status: e.target.value })}>{['ACTIVE', 'INACTIVE', 'TERMINATED'].map((s) => <option key={s} value={s}>{s}</option>)}</select></div>
         </div>

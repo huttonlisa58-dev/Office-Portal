@@ -88,7 +88,7 @@ function TimeModal({ companyId, employeeId, onClose, onDone }) {
     <Modal open onClose={onClose} title="Log time">
       <div className="space-y-3">
         {err && <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{err}</div>}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div><label className="label">Date</label><input type="date" className="input" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div>
           <div><label className="label">Hours</label><input type="number" step="0.5" className="input" value={form.hours} onChange={(e) => setForm({ ...form, hours: e.target.value })} /></div>
         </div>

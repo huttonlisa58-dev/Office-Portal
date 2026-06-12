@@ -57,7 +57,7 @@ function CheckInOut() {
   if (day.open) {
     return (
       <button onClick={doPunch} disabled={busy}
-        className="flex items-center gap-2 rounded-full border-2 border-sky-500 bg-sky-50 px-4 py-1.5 text-sm font-bold tracking-wide text-sky-700 transition hover:bg-sky-100 disabled:opacity-60 dark:bg-sky-950/40 dark:text-sky-300" title="Tap to check out">
+        className="flex items-center gap-2 rounded-full border-2 border-sky-500 bg-sky-50 px-3 py-1.5 text-sm font-bold tracking-wide sm:px-4 text-sky-700 transition hover:bg-sky-100 disabled:opacity-60 dark:bg-sky-950/40 dark:text-sky-300" title="Tap to check out">
         <span className="tabular-nums">{fmtHMS(day.workMs / 1000)}</span>
         <span className="text-xs">{busy ? '…' : 'CHECK OUT'}</span>
       </button>
@@ -65,7 +65,7 @@ function CheckInOut() {
   }
   return (
     <button onClick={doPunch} disabled={busy}
-      className="flex items-center gap-2 rounded-full bg-sky-500 px-4 py-1.5 text-sm font-bold tracking-wide text-white transition hover:bg-sky-600 disabled:opacity-60" title="Tap to check in">
+      className="flex items-center gap-2 rounded-full bg-sky-500 px-3 py-1.5 text-sm font-bold tracking-wide sm:px-4 text-white transition hover:bg-sky-600 disabled:opacity-60" title="Tap to check in">
       <LogIn size={15} /> {busy ? '…' : 'CHECK IN'}
       {day.count > 0 && <span className="rounded bg-white/20 px-1.5 text-xs tabular-nums">{fmtHMS(day.workMs / 1000)}</span>}
     </button>
@@ -97,7 +97,7 @@ export default function Topbar({ onMenu }) {
   const go = (path) => { setMenuOpen(false); setNotifOpen(false); router.push(path); };
 
   return (
-    <header ref={wrapRef} className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b bg-white/80 px-4 backdrop-blur dark:bg-slate-900/80">
+    <header ref={wrapRef} className="sticky top-0 z-20 flex h-16 items-center gap-1.5 border-b bg-white/80 px-2 backdrop-blur dark:bg-slate-900/80 sm:gap-3 sm:px-4">
       <button className="btn-ghost p-2 lg:hidden" onClick={onMenu} aria-label="Open menu"><Menu size={20} /></button>
       <div className="flex-1" />
 
@@ -119,7 +119,7 @@ export default function Topbar({ onMenu }) {
           )}
         </button>
         {notifOpen && (
-          <div className="absolute right-0 top-12 z-30 w-80 overflow-hidden rounded-xl border bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800">
+          <div className="absolute right-0 top-12 z-30 w-[min(20rem,calc(100vw-1rem))] overflow-hidden rounded-xl border bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800">
             <div className="flex items-center justify-between border-b px-4 py-3 dark:border-slate-700">
               <div>
                 <div className="text-sm font-semibold">Notifications</div>
@@ -150,7 +150,7 @@ export default function Topbar({ onMenu }) {
       </div>
 
       {/* Profile menu */}
-      <div className="relative flex items-center gap-3 border-l pl-3">
+      <div className="relative flex items-center gap-2 border-l pl-2 sm:gap-3 sm:pl-3">
         <button className="flex items-center gap-3" onClick={() => { setMenuOpen((o) => !o); setNotifOpen(false); }}>
           <div className="grid h-9 w-9 place-items-center rounded-full bg-orange-500 text-xs font-semibold text-white">
             {initials(user?.name || 'U')}
