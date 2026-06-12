@@ -1,140 +1,237 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { BarChart3, Download } from 'lucide-react';
-import { ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
-import PageHeader from '@/components/PageHeader';
+import { BarChart3, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, LogIn, LogOut, ArrowLeft, Plane } from 'lucide-react';
+import PageBanner from '@/components/PageBanner';
 import Loader from '@/components/Loader';
-import { money } from '@/lib/format';
-import { attendance as attApi, leaves as leaveApi, payroll as payApi } from '@/lib/db';
+import { useAuth } from '@/context/AuthContext';
+import { punch, computeDay, leaves as leaveApi } from '@/lib/db';
 
-const PIE = ['#1f49f5', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6'];
-const TABS = [
-  { key: 'attendance', label: 'Attendance' },
-  { key: 'leave', label: 'Leave' },
-  { key: 'payroll', label: 'Payroll' },
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const pad = (n) => String(n).padStart(2, '0');
+const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const fmtDur = (ms) => { if (!ms) return '—'; const m = Math.floor(ms / 60000); return `${Math.floor(m / 60)}h ${pad(m % 60)}m`; };
+const fmtTime = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+const statusBadge = (s) => {
+  const map = { PRESENT: 'bg-emerald-100 text-emerald-700', ABSENT: 'bg-rose-100 text-rose-700', APPROVED: 'bg-emerald-100 text-emerald-700', PENDING: 'bg-amber-100 text-amber-700', REJECTED: 'bg-rose-100 text-rose-700' };
+  return map[s] || 'bg-slate-100 text-slate-600';
+};
+
+function MonthNav({ cursor, onMove }) {
+  return (
+    <div className="flex items-center gap-2">
+      <button onClick={() => onMove(-1)} className="grid h-8 w-8 place-items-center rounded-lg border hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" aria-label="Previous"><ChevronLeft size={16} /></button>
+      <span className="min-w-[120px] text-center text-sm font-semibold">{MONTHS_FULL[cursor.m]} {cursor.y}</span>
+      <button onClick={() => onMove(1)} className="grid h-8 w-8 place-items-center rounded-lg border hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800" aria-label="Next"><ChevronRight size={16} /></button>
+    </div>
+  );
+}
+function useMonth() {
+  const [cursor, setCursor] = useState(() => { const d = new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const move = (delta) => setCursor((c) => { const d = new Date(c.y, c.m + delta, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const range = useMemo(() => ({ start: ymd(new Date(cursor.y, cursor.m, 1)), end: ymd(new Date(cursor.y, cursor.m + 1, 0)), days: new Date(cursor.y, cursor.m + 1, 0).getDate() }), [cursor]);
+  return { cursor, move, range };
+}
+
+/* ---------- Report: My Check-in / Check-out ---------- */
+function CheckInOutReport({ employeeId }) {
+  const { cursor, move, range } = useMonth();
+  const [byDate, setByDate] = useState({});
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { let a = true; setLoading(true); punch.month(employeeId, range.start, range.end).then((d) => { if (a) setByDate(d); }).catch(() => {}).finally(() => { if (a) setLoading(false); }); return () => { a = false; }; }, [employeeId, range.start, range.end]);
+  const today = ymd(new Date());
+  const rows = Array.from({ length: range.days }, (_, i) => {
+    const date = `${cursor.y}-${pad(cursor.m + 1)}-${pad(i + 1)}`;
+    const punches = (byDate[date] || []).map((p) => ({ at: p.at, type: p.type }));
+    const day = computeDay(punches, Date.now());
+    const first = day.sessions[0]?.in || null;
+    const last = [...day.sessions].reverse().find((s) => s.out)?.out || null;
+    const has = punches.length > 0;
+    const status = has ? 'PRESENT' : (date < today ? 'ABSENT' : '');
+    return { date, weekday: new Date(cursor.y, cursor.m, i + 1).toLocaleDateString([], { weekday: 'short' }), first, last, work: day.workMs, status, future: date > today };
+  });
+  return (
+    <ReportShell title="My Check-in / Check-out" cursor={cursor} onMove={move}>
+      {loading ? <Loader /> : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-sm">
+            <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700">
+              <th className="px-3 py-2.5">Date</th><th className="px-3 py-2.5">Day</th><th className="px-3 py-2.5">First in</th><th className="px-3 py-2.5">Last out</th><th className="px-3 py-2.5">Total hours</th><th className="px-3 py-2.5">Status</th>
+            </tr></thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.date} className={`border-b dark:border-slate-700 ${r.future ? 'opacity-40' : ''}`}>
+                  <td className="whitespace-nowrap px-3 py-2.5">{r.date}</td>
+                  <td className="px-3 py-2.5 text-slate-500">{r.weekday}</td>
+                  <td className="px-3 py-2.5">{fmtTime(r.first)}</td>
+                  <td className="px-3 py-2.5">{fmtTime(r.last)}</td>
+                  <td className="px-3 py-2.5 tabular-nums">{r.status === 'PRESENT' ? fmtDur(r.work) : '—'}</td>
+                  <td className="px-3 py-2.5">{r.status ? <span className={`badge ${statusBadge(r.status)}`}>{r.status}</span> : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </ReportShell>
+  );
+}
+
+/* ---------- Report: Entry / Exit ---------- */
+function EntryExitReport({ employeeId }) {
+  const { cursor, move, range } = useMonth();
+  const [byDate, setByDate] = useState({});
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { let a = true; setLoading(true); punch.month(employeeId, range.start, range.end).then((d) => { if (a) setByDate(d); }).catch(() => {}).finally(() => { if (a) setLoading(false); }); return () => { a = false; }; }, [employeeId, range.start, range.end]);
+  const events = Object.keys(byDate).sort().flatMap((date) => (byDate[date] || []).map((p) => ({ date, at: p.at, type: p.type }))).sort((a, b) => new Date(b.at) - new Date(a.at));
+  return (
+    <ReportShell title="Entry / Exit" cursor={cursor} onMove={move}>
+      {loading ? <Loader /> : events.length === 0 ? <Empty text="No entry / exit records this month." /> : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[480px] text-sm">
+            <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700">
+              <th className="px-3 py-2.5">Date</th><th className="px-3 py-2.5">Time</th><th className="px-3 py-2.5">Event</th>
+            </tr></thead>
+            <tbody>
+              {events.map((e, i) => (
+                <tr key={i} className="border-b dark:border-slate-700">
+                  <td className="whitespace-nowrap px-3 py-2.5">{e.date}</td>
+                  <td className="px-3 py-2.5 tabular-nums">{fmtTime(e.at)}</td>
+                  <td className="px-3 py-2.5">
+                    {e.type === 'IN'
+                      ? <span className="inline-flex items-center gap-1.5 font-medium text-emerald-600"><LogIn size={14} /> Entry</span>
+                      : <span className="inline-flex items-center gap-1.5 font-medium text-rose-600"><LogOut size={14} /> Exit</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </ReportShell>
+  );
+}
+
+/* ---------- Report: My leave summary ---------- */
+function LeaveSummaryReport({ employeeId }) {
+  const [bal, setBal] = useState(null);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { let a = true; setLoading(true); Promise.all([leaveApi.balance(employeeId), leaveApi.mine(employeeId)]).then(([b, l]) => { if (a) { setBal(b?.balances || null); setRows(l); } }).catch(() => {}).finally(() => { if (a) setLoading(false); }); return () => { a = false; }; }, [employeeId]);
+  const cards = bal ? [['Casual', bal.CASUAL], ['Sick', bal.SICK], ['Earned', bal.EARNED]] : [];
+  return (
+    <ReportShell title="My leave summary" noNav>
+      {loading ? <Loader /> : (
+        <>
+          {cards.length > 0 && (
+            <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {cards.map(([k, v]) => (
+                <div key={k} className="rounded-xl border p-4 dark:border-slate-700">
+                  <div className="text-xs uppercase tracking-wide text-slate-400">{k} leave</div>
+                  <div className="mt-1 text-2xl font-bold text-sky-600">{v ?? 0}<span className="ml-1 text-sm font-normal text-slate-400">days left</span></div>
+                </div>
+              ))}
+            </div>
+          )}
+          {rows.length === 0 ? <Empty text="No leave applications yet." /> : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700">
+                  <th className="px-3 py-2.5">Type</th><th className="px-3 py-2.5">From</th><th className="px-3 py-2.5">To</th><th className="px-3 py-2.5">Days</th><th className="px-3 py-2.5">Status</th>
+                </tr></thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r._id} className="border-b dark:border-slate-700">
+                      <td className="px-3 py-2.5 capitalize">{String(r.type || '').toLowerCase()}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5">{r.from}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5">{r.to}</td>
+                      <td className="px-3 py-2.5">{r.days}</td>
+                      <td className="px-3 py-2.5"><span className={`badge ${statusBadge(r.status)}`}>{r.status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
+      )}
+    </ReportShell>
+  );
+}
+
+function Empty({ text }) { return <div className="grid place-items-center py-12 text-sm text-slate-400">{text}</div>; }
+function ReportShell({ title, cursor, onMove, noNav, children }) {
+  return (
+    <div className="card p-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 dark:border-slate-700">
+        <h3 className="font-semibold">{title}</h3>
+        {!noNav && cursor && <MonthNav cursor={cursor} onMove={onMove} />}
+      </div>
+      <div className="p-3 sm:p-4">{children}</div>
+    </div>
+  );
+}
+
+/* ---------- Directory ---------- */
+const CATEGORIES = [
+  { key: 'attendance', label: 'Attendance tracker reports', icon: CalendarCheck, reports: [
+    { key: 'checkinout', label: 'My Check-in / Check-out' },
+    { key: 'entryexit', label: 'Entry / Exit' },
+  ] },
+  { key: 'leave', label: 'Leave tracker reports', icon: Plane, reports: [
+    { key: 'leavesummary', label: 'My leave summary' },
+  ] },
 ];
 
 export default function ReportsPage() {
-  const [tab, setTab] = useState('attendance');
-  const [att, setAtt] = useState([]);
-  const [leaves, setLeaves] = useState([]);
-  const [payroll, setPayroll] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const employeeId = user?.employee;
+  const [cat, setCat] = useState('attendance');
+  const [report, setReport] = useState(null);
 
-  useEffect(() => {
-    Promise.all([
-      attApi.list({ from: daysAgo(30) }),
-      leaveApi.list(),
-      payApi.list(),
-    ]).then(([a, l, p]) => {
-      setAtt(a); setLeaves(l); setPayroll(p);
-    }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
-
-  const attByStatus = useMemo(() => groupCount(att, 'status'), [att]);
-  const leaveByStatus = useMemo(() => groupCount(leaves, 'status'), [leaves]);
-  const leaveByType = useMemo(() => groupCount(leaves, 'type'), [leaves]);
-  const payrollByMonth = useMemo(() => {
-    const m = {};
-    payroll.forEach((p) => { const k = `${p.month}/${p.year}`; m[k] = (m[k] || 0) + p.netPay; });
-    return Object.entries(m).map(([k, v]) => ({ name: k, net: Math.round(v) }));
-  }, [payroll]);
-  const totalNet = payroll.reduce((s, p) => s + p.netPay, 0);
-
-  const exportCsv = () => {
-    const map = {
-      attendance: { rows: att, cols: ['date', 'status', 'workedMinutes', 'overtimeMinutes'], name: 'attendance' },
-      leave: { rows: leaves, cols: ['type', 'from', 'to', 'days', 'status'], name: 'leave' },
-      payroll: { rows: payroll, cols: ['month', 'year', 'gross', 'tax', 'netPay', 'status'], name: 'payroll' },
-    }[tab];
-    downloadCsv(map.name, map.cols, map.rows);
-  };
-
-  if (loading) return <Loader />;
+  const activeCat = CATEGORIES.find((c) => c.key === cat);
 
   return (
     <>
-      <PageHeader title="Reports & Analytics" subtitle="Last 30 days of activity across your workspace"
-        actions={<button className="btn-outline" onClick={exportCsv}><Download size={16} /> Export CSV</button>} />
+      <PageBanner icon={BarChart3} title="Reports" />
+      <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
+        {/* left rail */}
+        <div className="card h-fit p-2">
+          {CATEGORIES.map((c) => {
+            const Icon = c.icon;
+            return (
+              <button key={c.key} onClick={() => { setCat(c.key); setReport(null); }}
+                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition ${cat === c.key ? 'bg-sky-500 text-white' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
+                <Icon size={16} /> {c.label}
+              </button>
+            );
+          })}
+        </div>
 
-      <div className="mb-6 inline-flex rounded-xl border bg-white p-1 dark:bg-slate-900">
-        {TABS.map((t) => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${tab === t.key ? 'bg-brand-600 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>{t.label}</button>
-        ))}
+        {/* content */}
+        <div>
+          {!report ? (
+            <div className="card p-0">
+              <div className="flex items-center gap-2 border-b px-4 py-3 dark:border-slate-700">
+                {activeCat.icon && <activeCat.icon size={18} className="text-sky-500" />}
+                <h3 className="text-base font-semibold">{activeCat.label}</h3>
+              </div>
+              <div className="flex flex-wrap gap-x-6 gap-y-2 p-4">
+                {activeCat.reports.map((r) => (
+                  <button key={r.key} onClick={() => setReport(r.key)} className="text-sm font-medium text-sky-600 hover:underline">{r.label}</button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <button onClick={() => setReport(null)} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-sky-600"><ArrowLeft size={15} /> Back to {activeCat.label}</button>
+              {report === 'checkinout' && <CheckInOutReport employeeId={employeeId} />}
+              {report === 'entryexit' && <EntryExitReport employeeId={employeeId} />}
+              {report === 'leavesummary' && <LeaveSummaryReport employeeId={employeeId} />}
+            </div>
+          )}
+        </div>
       </div>
-
-      {tab === 'attendance' && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <ChartCard title="Records by status">
-            {attByStatus.length ? <PieView data={attByStatus} /> : <Empty />}
-          </ChartCard>
-          <ChartCard title="Volume by status">
-            {attByStatus.length ? <BarView data={attByStatus} /> : <Empty />}
-          </ChartCard>
-        </div>
-      )}
-
-      {tab === 'leave' && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <ChartCard title="Requests by status">{leaveByStatus.length ? <PieView data={leaveByStatus} /> : <Empty />}</ChartCard>
-          <ChartCard title="Requests by type">{leaveByType.length ? <BarView data={leaveByType} /> : <Empty />}</ChartCard>
-        </div>
-      )}
-
-      {tab === 'payroll' && (
-        <div className="grid gap-6">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="card p-5"><div className="text-sm text-slate-500">Total net paid</div><div className="mt-1 text-2xl font-semibold">{money(totalNet)}</div></div>
-            <div className="card p-5"><div className="text-sm text-slate-500">Runs</div><div className="mt-1 text-2xl font-semibold">{payroll.length}</div></div>
-            <div className="card p-5"><div className="text-sm text-slate-500">Paid</div><div className="mt-1 text-2xl font-semibold">{payroll.filter((p) => p.status === 'PAID').length}</div></div>
-          </div>
-          <ChartCard title="Net pay by month">
-            {payrollByMonth.length ? (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={payrollByMonth} margin={{ left: -10 }}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} /><XAxis dataKey="name" fontSize={12} /><YAxis fontSize={12} />
-                  <Tooltip /><Bar dataKey="net" fill="#1f49f5" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : <Empty />}
-          </ChartCard>
-        </div>
-      )}
     </>
   );
-}
-
-function ChartCard({ title, children }) { return <div className="card p-5"><h3 className="mb-4 font-semibold">{title}</h3>{children}</div>; }
-function Empty() { return <p className="py-12 text-center text-sm text-slate-400">No data for this period.</p>; }
-function PieView({ data }) {
-  return (
-    <ResponsiveContainer width="100%" height={280}>
-      <PieChart><Pie data={data} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={3}>
-        {data.map((_, i) => <Cell key={i} fill={PIE[i % PIE.length]} />)}</Pie><Legend /><Tooltip /></PieChart>
-    </ResponsiveContainer>
-  );
-}
-function BarView({ data }) {
-  return (
-    <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={data} margin={{ left: -10 }}><CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-        <XAxis dataKey="name" fontSize={12} /><YAxis fontSize={12} allowDecimals={false} /><Tooltip />
-        <Bar dataKey="value" fill="#1f49f5" radius={[6, 6, 0, 0]} /></BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-function groupCount(rows, key) {
-  const m = {};
-  rows.forEach((r) => { const k = r[key] || 'UNKNOWN'; m[k] = (m[k] || 0) + 1; });
-  return Object.entries(m).map(([name, value]) => ({ name: String(name).replace(/_/g, ' '), value }));
-}
-function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }
-function downloadCsv(name, cols, rows) {
-  const header = cols.join(',');
-  const body = rows.map((r) => cols.map((c) => JSON.stringify(r[c] ?? '')).join(',')).join('\n');
-  const blob = new Blob([`${header}\n${body}`], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = `${name}-report.csv`; a.click(); URL.revokeObjectURL(url);
 }

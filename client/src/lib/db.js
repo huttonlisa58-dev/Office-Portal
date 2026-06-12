@@ -210,6 +210,13 @@ export const leaves = {
     const { data } = await supabase.from('leaves').select('*, employee:employees!leaves_employee_id_fkey(first_name,last_name,employee_code)').order('created_at', { ascending: false });
     return (data || []).map(mLeave);
   },
+  async mine(employeeId) {
+    if (!employeeId) return [];
+    const { data } = await supabase.from('leaves')
+      .select('*, employee:employees!leaves_employee_id_fkey(first_name,last_name,employee_code)')
+      .eq('employee_id', employeeId).order('created_at', { ascending: false });
+    return (data || []).map(mLeave);
+  },
   async balance(employeeId) {
     const year = new Date().getFullYear();
     let q = supabase.from('leave_balances').select('*').eq('year', year);
@@ -423,6 +430,22 @@ export const punch = {
       company_id: companyId, employee_id: employeeId, type, work_date: localDate(),
     });
     if (error) throw new Error(error.message);
+  },
+};
+
+// ---------- shifts ----------
+export const shifts = {
+  // current employee's assigned shift + weekly off day (0=Sun..6=Sat)
+  async mine(employeeId) {
+    if (!employeeId) return { shift: null, weeklyOff: 0 };
+    const { data } = await supabase.from('employees')
+      .select('weekly_off, shift:shifts(id,code,name,start_time,end_time,color)')
+      .eq('id', employeeId).maybeSingle();
+    return { shift: data?.shift || null, weeklyOff: data?.weekly_off ?? 0 };
+  },
+  async list() {
+    const { data } = await supabase.from('shifts').select('*').eq('is_active', true).order('start_time');
+    return (data || []).map((s) => ({ _id: s.id, code: s.code, name: s.name, start: s.start_time, end: s.end_time, color: s.color }));
   },
 };
 
