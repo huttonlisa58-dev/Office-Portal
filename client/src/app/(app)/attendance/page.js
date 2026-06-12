@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { UserCheck } from 'lucide-react';
 import PageBanner from '@/components/PageBanner';
 import MyAttendance from '@/components/MyAttendance';
+import CheckInOutCard from '@/components/CheckInOutCard';
 import TeamAttendanceGrid from '@/components/TeamAttendanceGrid';
 import { useAuth } from '@/context/AuthContext';
 
@@ -24,7 +25,12 @@ export default function AttendancePage() {
           ))}
         </div>
       )}
-      {view === 'team' ? <TeamAttendanceGrid /> : <MyAttendance employeeId={user?.employee} />}
+      {view === 'team' ? <TeamAttendanceGrid /> : (
+        <>
+          <CheckInOutCard employeeId={user?.employee} companyId={user?.company} />
+          <MyAttendance employeeId={user?.employee} />
+        </>
+      )}
     </>
   );
 }

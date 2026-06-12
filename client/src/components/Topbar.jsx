@@ -5,7 +5,7 @@ import { Menu, Sun, Moon, Bell, LogOut, LogIn, Clock, User, Mail, CheckCheck, In
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { initials } from '@/lib/format';
-import { notifications, attendance } from '@/lib/db';
+import { notifications, punch, computeDay } from '@/lib/db';
 
 function fmtHMS(totalSec) {
   const s = Math.max(0, Math.floor(totalSec));
@@ -23,58 +23,51 @@ const ago = (d) => {
 };
 
 function CheckInOut() {
-  const { user, company } = useAuth();
+  const { user } = useAuth();
   const employeeId = user?.employee;
-  const tz = company?.timezone || 'UTC';
-  const [record, setRecord] = useState(null);
+  const companyId = user?.company;
+  const [punches, setPunches] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
 
   const refresh = useCallback(async () => {
     if (!employeeId) { setLoaded(true); return; }
-    try { setRecord(await attendance.myToday(employeeId, tz)); }
+    try { setPunches(await punch.today(employeeId)); }
     catch { /* ignore */ } finally { setLoaded(true); }
-  }, [employeeId, tz]);
+  }, [employeeId]);
   useEffect(() => { refresh(); }, [refresh]);
 
-  const running = record?.checkInAt && !record?.checkOutAt;
+  const day = computeDay(punches, now);
   useEffect(() => {
-    if (!running) return;
+    if (!day.open) return;
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [running]);
+  }, [day.open]);
 
   if (!employeeId || !loaded) return null;
-  const punch = async (action) => {
+
+  const doPunch = async () => {
     setBusy(true);
-    try { await attendance.punch(action); await refresh(); }
+    try { await punch.toggle(companyId, employeeId, day.open ? 'OUT' : 'IN'); await refresh(); }
     catch (e) { alert(e.message || 'Could not record attendance'); }
     finally { setBusy(false); }
   };
 
-  if (record?.checkOutAt) {
-    const mins = record.workedMinutes || Math.round((new Date(record.checkOutAt) - new Date(record.checkInAt)) / 60000);
+  if (day.open) {
     return (
-      <div className="flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-sm font-semibold text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
-        <Clock size={15} /> {fmtHMS(mins * 60)} <span className="text-xs font-medium opacity-70">DONE</span>
-      </div>
-    );
-  }
-  if (running) {
-    const elapsed = (now - new Date(record.checkInAt).getTime()) / 1000;
-    return (
-      <button onClick={() => punch('check-out')} disabled={busy}
+      <button onClick={doPunch} disabled={busy}
         className="flex items-center gap-2 rounded-full border-2 border-sky-500 bg-sky-50 px-4 py-1.5 text-sm font-bold tracking-wide text-sky-700 transition hover:bg-sky-100 disabled:opacity-60 dark:bg-sky-950/40 dark:text-sky-300" title="Tap to check out">
-        <span className="tabular-nums">{fmtHMS(elapsed)}</span>
+        <span className="tabular-nums">{fmtHMS(day.workMs / 1000)}</span>
         <span className="text-xs">{busy ? '…' : 'CHECK OUT'}</span>
       </button>
     );
   }
   return (
-    <button onClick={() => punch('check-in')} disabled={busy}
+    <button onClick={doPunch} disabled={busy}
       className="flex items-center gap-2 rounded-full bg-sky-500 px-4 py-1.5 text-sm font-bold tracking-wide text-white transition hover:bg-sky-600 disabled:opacity-60" title="Tap to check in">
       <LogIn size={15} /> {busy ? '…' : 'CHECK IN'}
+      {day.count > 0 && <span className="rounded bg-white/20 px-1.5 text-xs tabular-nums">{fmtHMS(day.workMs / 1000)}</span>}
     </button>
   );
 }
