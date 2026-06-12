@@ -80,6 +80,13 @@ export async function getDashboard(profile, company) {
   const present = (today || []).filter((r) => r.check_in_at).length;
   const late = (today || []).filter((r) => r.is_late).length;
   const now = new Date();
+  // present-today now also counts the check-in/out punch system
+  const istDate = new Intl.DateTimeFormat('en-CA', { timeZone: company?.timezone || 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+  const { data: punchRows } = await supabase.from('attendance_punches').select('employee_id').eq('company_id', cid).eq('work_date', istDate);
+  const presentSet = new Set();
+  (today || []).forEach((r) => { if (r.check_in_at) presentSet.add(r.employee_id); });
+  (punchRows || []).forEach((r) => presentSet.add(r.employee_id));
+  const presentCount = presentSet.size || present;
   const { data: pr } = await supabase.from('payrolls').select('net_pay').eq('company_id', cid).eq('month', now.getMonth() + 1).eq('year', now.getFullYear());
   const payrollThisMonth = (pr || []).reduce((s, x) => s + Number(x.net_pay), 0);
   // 7-day trend
@@ -91,8 +98,8 @@ export async function getDashboard(profile, company) {
   return {
     scope: 'COMPANY',
     widgets: {
-      totalEmployees: totalEmployees || 0, presentToday: present, lateToday: late,
-      absentToday: (totalEmployees || 0) - present, pendingLeaves: pendingLeaves || 0,
+      totalEmployees: totalEmployees || 0, presentToday: presentCount, lateToday: late,
+      absentToday: Math.max(0, (totalEmployees || 0) - presentCount), pendingLeaves: pendingLeaves || 0,
       payrollThisMonth, payrollRunCount: (pr || []).length,
     },
     attendanceTrend, departmentHeadcount: [],
@@ -169,16 +176,25 @@ export const attendance = {
   async month(year, monthIndex) {
     const start = new Date(Date.UTC(year, monthIndex, 1)).toISOString().slice(0, 10);
     const end = new Date(Date.UTC(year, monthIndex + 1, 0)).toISOString().slice(0, 10);
-    const [emps, att, lv, hol] = await Promise.all([
+    const [emps, att, lv, hol, punches] = await Promise.all([
       supabase.from('employees').select('id,first_name,last_name,employee_code').eq('status', 'ACTIVE').order('employee_code'),
       supabase.from('attendance').select('employee_id,work_date,status').gte('work_date', start).lte('work_date', end),
       supabase.from('leaves').select('employee_id,from_date,to_date,leave_type').eq('status', 'APPROVED').lte('from_date', end).gte('to_date', start),
       supabase.from('holidays').select('date,name').gte('date', start).lte('date', end),
+      supabase.from('attendance_punches').select('employee_id,work_date').gte('work_date', start).lte('work_date', end),
     ]);
+    // Mark days with a punch as PRESENT (new check-in/out system), merging with legacy attendance rows
+    const existing = new Set((att.data || []).map((a) => `${a.employee_id}|${a.work_date}`));
+    const seen = new Set();
+    const punchPresent = [];
+    (punches.data || []).forEach((p) => {
+      const key = `${p.employee_id}|${p.work_date}`;
+      if (!existing.has(key) && !seen.has(key)) { seen.add(key); punchPresent.push({ employee_id: p.employee_id, work_date: p.work_date, status: 'PRESENT' }); }
+    });
     return {
       start, end,
       employees: (emps.data || []).map((e) => ({ id: e.id, name: `${e.first_name} ${e.last_name || ''}`.trim(), code: e.employee_code })),
-      attendance: att.data || [], leaves: lv.data || [], holidays: hol.data || [],
+      attendance: [...(att.data || []), ...punchPresent], leaves: lv.data || [], holidays: hol.data || [],
     };
   },
   async mine(employeeId, year, monthIndex) {
