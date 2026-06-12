@@ -438,16 +438,35 @@ export const punch = {
   async month(employeeId, start, end) {
     if (!employeeId) return {};
     const { data } = await supabase.from('attendance_punches')
-      .select('work_date,type,punched_at').eq('employee_id', employeeId)
+      .select('work_date,type,punched_at,method').eq('employee_id', employeeId)
       .gte('work_date', start).lte('work_date', end).order('punched_at', { ascending: true });
     const byDate = {};
-    (data || []).forEach((p) => { (byDate[p.work_date] ||= []).push({ at: p.punched_at, type: p.type }); });
+    (data || []).forEach((p) => { (byDate[p.work_date] ||= []).push({ at: p.punched_at, type: p.type, method: p.method }); });
     return byDate;
   },
   async toggle(companyId, employeeId, type) {
     const { error } = await supabase.from('attendance_punches').insert({
       company_id: companyId, employee_id: employeeId, type, work_date: localDate(),
     });
+    if (error) throw new Error(error.message);
+  },
+  // Manual check-in/check-out entry: inserts an IN (+ optional OUT) punch on a given work_date
+  async addEntry({ companyId, employeeId, date, checkIn, checkOut, remarks }) {
+    if (!companyId || !employeeId || !date || !checkIn) throw new Error('Check-in time required');
+    const inAt = new Date(`${date}T${checkIn}:00`);
+    const rows = [{ company_id: companyId, employee_id: employeeId, work_date: date, type: 'IN', punched_at: inAt.toISOString(), method: 'MANUAL', remarks: remarks || null }];
+    if (checkOut) {
+      let outAt = new Date(`${date}T${checkOut}:00`);
+      if (outAt <= inAt) outAt = new Date(outAt.getTime() + 86400000); // crosses midnight (night shift)
+      rows.push({ company_id: companyId, employee_id: employeeId, work_date: date, type: 'OUT', punched_at: outAt.toISOString(), method: 'MANUAL', remarks: remarks || null });
+    }
+    const { error } = await supabase.from('attendance_punches').insert(rows);
+    if (error) throw new Error(error.message);
+  },
+  async deletePunches(ids) {
+    const list = (ids || []).filter(Boolean);
+    if (!list.length) return;
+    const { error } = await supabase.from('attendance_punches').delete().in('id', list);
     if (error) throw new Error(error.message);
   },
 };

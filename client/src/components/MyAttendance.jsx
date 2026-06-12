@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, Turtle, Hand, Flame, X, Monitor, MapPin } from 'lucide-react';
-import { attendance as attApi, punch, computeDay } from '@/lib/db';
+import { ChevronLeft, ChevronRight, Turtle, Hand, Flame, X, Monitor, MapPin, Trash2, Plus, ChevronDown } from 'lucide-react';
+import { attendance as attApi, punch, computeDay, shifts as shiftApi } from '@/lib/db';
 import { useAuth } from '@/context/AuthContext';
 import Loader from '@/components/Loader';
 
@@ -21,31 +21,102 @@ const CODE = {
   '': 'text-slate-300',
 };
 
-function DayDetailModal({ employeeId, date, user, onClose }) {
+function buildSessions(punches) {
+  const sorted = [...punches].sort((a, b) => new Date(a.at) - new Date(b.at));
+  const sessions = [];
+  let open = null;
+  for (const p of sorted) {
+    if (p.type === 'IN') { if (open) sessions.push(open); open = { inId: p._id, inAt: p.at, outId: null, outAt: null, manual: p.method === 'MANUAL' }; }
+    else { if (open) { open.outId = p._id; open.outAt = p.at; if (p.method === 'MANUAL') open.manual = true; sessions.push(open); open = null; } else sessions.push({ inId: null, inAt: null, outId: p._id, outAt: p.at, manual: p.method === 'MANUAL' }); }
+  }
+  if (open) sessions.push(open);
+  return sessions;
+}
+
+const toTimeInput = (iso) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+
+function AddEntryModal({ initial, onSave, onCancel, busy }) {
+  const [checkIn, setCheckIn] = useState(initial?.checkIn || '');
+  const [checkOut, setCheckOut] = useState(initial?.checkOut || '');
+  const [remarks, setRemarks] = useState('');
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
+      <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between bg-sky-500 px-5 py-3 text-white">
+          <h3 className="font-semibold">Add / Edit entries</h3>
+          <button onClick={onCancel} className="rounded p-1 hover:bg-white/20"><X size={18} /></button>
+        </div>
+        <div className="space-y-3 p-5">
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="label">Check-in <span className="text-rose-400">*</span></label><input type="time" className="input" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} /></div>
+            <div><label className="label">Check-out <span className="text-rose-400">*</span></label><input type="time" className="input" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} /></div>
+          </div>
+          <div><label className="label">Remarks</label><input className="input" value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Reason for manual entry" /></div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={onCancel} className="btn-outline">Cancel</button>
+            <button onClick={() => onSave({ checkIn, checkOut, remarks })} disabled={busy || !checkIn} className="btn-primary">{busy ? 'Saving…' : 'Save'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DayDetailModal({ employeeId, companyId, date, user, onClose, onChanged }) {
   const [punches, setPunches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [shift, setShift] = useState(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [addInit, setAddInit] = useState(null); // null = closed
   const isToday = date === new Date().toISOString().slice(0, 10);
 
-  useEffect(() => {
-    let on = true;
-    punch.forDate(employeeId, date).then((p) => { if (on) setPunches(p); }).catch(() => {}).finally(() => { if (on) setLoading(false); });
-    return () => { on = false; };
+  const reload = useCallback(() => {
+    setLoading(true);
+    return punch.forDate(employeeId, date).then((p) => setPunches(p)).catch(() => {}).finally(() => setLoading(false));
   }, [employeeId, date]);
+  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => { shiftApi.mine(employeeId).then((r) => setShift(r.shift)).catch(() => {}); }, [employeeId]);
 
   const nowMs = isToday ? Date.now() : (punches.length ? new Date(punches[punches.length - 1].at).getTime() : Date.now());
   const day = computeDay(punches, nowMs);
+  const sessions = useMemo(() => buildSessions(punches), [punches]);
   const dObj = new Date(date + 'T00:00:00');
   const status = day.workMs > 0 ? (day.open && isToday ? 'Working' : 'Present') : (date < new Date().toISOString().slice(0, 10) ? 'Absent' : 'Pending');
+  const firstIn = sessions.find((s) => s.inAt)?.inAt || null;
+  const lastOut = [...sessions].reverse().find((s) => s.outAt)?.outAt || null;
+  const hhmmShift = (t) => t ? String(t).slice(0, 5) : '';
+
+  const doDelete = async (s) => {
+    setBusy(true);
+    try { await punch.deletePunches([s.inId, s.outId]); await reload(); onChanged?.(); }
+    catch (e) { alert(e.message || 'Could not delete'); } finally { setBusy(false); }
+  };
+  const doAdd = async ({ checkIn, checkOut, remarks }) => {
+    setBusy(true);
+    try { await punch.addEntry({ companyId, employeeId, date, checkIn, checkOut, remarks }); setAddInit(null); await reload(); onChanged?.(); }
+    catch (e) { alert(e.message || 'Could not save'); } finally { setBusy(false); }
+  };
+  const openAdd = (kind) => {
+    setMenuOpen(false);
+    if (kind === 'full') setAddInit({ checkIn: hhmmShift(shift?.start) || '09:00', checkOut: hhmmShift(shift?.end) || '18:00' });
+    else if (kind === 'half') {
+      const s = hhmmShift(shift?.start) || '09:00';
+      const [h, m] = s.split(':').map(Number);
+      const mid = `${String((h + 4) % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      setAddInit({ checkIn: s, checkOut: mid });
+    } else setAddInit({ checkIn: '', checkOut: '' });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/40" onClick={onClose}>
-      <div className="h-full w-full max-w-xl overflow-y-auto bg-white shadow-2xl dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
+      <div className="flex h-full w-full max-w-xl flex-col bg-white shadow-2xl dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between bg-sky-500 px-6 py-4 text-white">
           <h2 className="text-lg font-semibold">Check-in / Check-out</h2>
           <button onClick={onClose} className="rounded p-1 hover:bg-white/20"><X size={20} /></button>
         </div>
 
-        <div className="space-y-4 p-6">
+        <div className="flex-1 space-y-4 overflow-y-auto p-6">
           <div className="grid grid-cols-2 gap-y-3 text-sm">
             <div><span className="text-slate-400">Name</span><div className="font-medium">{user?.name || '—'}</div></div>
             <div className="text-right"><span className="text-slate-400">Employee id</span><div className="font-medium">{user?.employeeCode || '—'}</div></div>
@@ -54,34 +125,54 @@ function DayDetailModal({ employeeId, date, user, onClose }) {
             <div><span className="text-slate-400">Total in-time</span><div className="font-semibold text-sky-600">{hhmm(day.workMs)}</div></div>
             <div className="text-right"><span className="text-slate-400">Total out-time (break)</span><div className="font-semibold text-amber-600">{hhmm(day.breakMs)}</div></div>
             <div><span className="text-slate-400">Status</span><div className="font-medium">{status}</div></div>
-            <div className="text-right"><span className="text-slate-400">Sessions</span><div className="font-medium">{day.sessions.length}</div></div>
+            <div className="text-right"><span className="text-slate-400">Shift</span><div className="font-medium">{shift ? `${shift.name} (${hhmmShift(shift.start)}–${hhmmShift(shift.end)})` : '—'}</div></div>
+            <div><span className="text-slate-400">First in</span><div className="font-medium">{clock(firstIn)}</div></div>
+            <div className="text-right"><span className="text-slate-400">Last out</span><div className="font-medium">{clock(lastOut)}</div></div>
           </div>
 
           <div className="rounded-xl border dark:border-slate-700">
-            <div className="grid grid-cols-2 border-b px-4 py-2.5 text-sm font-medium text-slate-500 dark:border-slate-700">
-              <div>Check-in</div><div>Check-out</div>
+            <div className="grid grid-cols-[1fr_1fr_auto] border-b px-4 py-2.5 text-sm font-medium text-slate-500 dark:border-slate-700">
+              <div>Check-in</div><div>Check-out</div><div className="w-8" />
             </div>
-            {loading ? <div className="p-6"><Loader /></div> : day.sessions.length === 0 ? (
+            {loading ? <div className="p-6"><Loader /></div> : sessions.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-slate-400">No check-in / check-out records for this day.</div>
-            ) : day.sessions.map((s, i) => (
-              <div key={i} className="grid grid-cols-2 border-b px-4 py-3 text-sm last:border-0 dark:border-slate-700">
+            ) : sessions.map((s, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_auto] items-center border-b px-4 py-3 text-sm last:border-0 dark:border-slate-700">
                 <div className="space-y-1">
-                  <div className="flex items-center gap-2"><Monitor size={14} className="text-slate-400" /> {clock(s.in)} <span className="text-xs text-slate-400">(W)</span></div>
-                  <div className="flex items-center gap-2 text-xs text-slate-400"><MapPin size={12} /> NA</div>
+                  {s.inAt ? (<>
+                    <div className="flex items-center gap-2"><Monitor size={14} className="text-slate-400" /> {clock(s.inAt)} <span className="text-xs text-slate-400">(W)</span>{s.manual && <Hand size={12} className="text-sky-500" />}</div>
+                    <div className="flex items-center gap-2 text-xs text-slate-400"><MapPin size={12} /> NA</div>
+                  </>) : <span className="text-xs text-slate-400">—</span>}
                 </div>
                 <div className="space-y-1">
-                  {s.out ? (<>
-                    <div className="flex items-center gap-2"><Monitor size={14} className="text-slate-400" /> {clock(s.out)} <span className="text-xs text-slate-400">(W)</span></div>
+                  {s.outAt ? (<>
+                    <div className="flex items-center gap-2"><Monitor size={14} className="text-slate-400" /> {clock(s.outAt)} <span className="text-xs text-slate-400">(W)</span></div>
                     <div className="flex items-center gap-2 text-xs text-slate-400"><MapPin size={12} /> NA</div>
                   </>) : <span className="text-xs text-emerald-600">in progress…</span>}
                 </div>
+                <button onClick={() => doDelete(s)} disabled={busy} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50 dark:hover:bg-rose-950/40" title="Delete entry"><Trash2 size={15} /></button>
               </div>
             ))}
           </div>
+        </div>
 
-          <button onClick={onClose} className="w-full rounded-xl bg-slate-100 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300">Close</button>
+        {/* footer */}
+        <div className="flex items-center justify-between gap-2 border-t px-6 py-4 dark:border-slate-700">
+          <div className="relative">
+            <button onClick={() => setMenuOpen((o) => !o)} className="btn-primary"><Plus size={15} /> Add entries <ChevronDown size={14} /></button>
+            {menuOpen && (
+              <div className="absolute bottom-12 left-0 z-10 w-52 overflow-hidden rounded-xl border bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-slate-800">
+                <button onClick={() => openAdd('full')} className="block w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700/40">Add full day entry</button>
+                <button onClick={() => openAdd('half')} className="block w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700/40">Add half day entry</button>
+                <button onClick={() => openAdd('manual')} className="block w-full px-4 py-2.5 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700/40">Add manual entry</button>
+              </div>
+            )}
+          </div>
+          <button onClick={onClose} className="rounded-lg bg-slate-100 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300">Close</button>
         </div>
       </div>
+
+      {addInit && <AddEntryModal initial={addInit} busy={busy} onSave={doAdd} onCancel={() => setAddInit(null)} />}
     </div>
   );
 }
@@ -96,7 +187,7 @@ export default function MyAttendance({ employeeId }) {
   const [loading, setLoading] = useState(true);
   const [dayModal, setDayModal] = useState(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!employeeId) { setLoading(false); return; }
     setLoading(true);
     const last = new Date(year, month + 1, 0).getDate();
@@ -107,6 +198,7 @@ export default function MyAttendance({ employeeId }) {
       .catch(() => { setData(null); setPunchMap({}); })
       .finally(() => setLoading(false));
   }, [employeeId, year, month]);
+  useEffect(() => { load(); }, [load]);
 
   const days = useMemo(() => new Date(Date.UTC(year, month + 1, 0)).getUTCDate(), [year, month]);
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -118,7 +210,7 @@ export default function MyAttendance({ employeeId }) {
       const day = computeDay(sessions, Date.now());
       const ins = sessions.filter((s) => s.type === 'IN').map((s) => s.at);
       const outs = sessions.filter((s) => s.type === 'OUT').map((s) => s.at);
-      out[date] = { workMin: Math.floor(day.workMs / 60000), first: ins[0] || null, last: outs[outs.length - 1] || null };
+      out[date] = { workMin: Math.floor(day.workMs / 60000), first: ins[0] || null, last: outs[outs.length - 1] || null, manual: sessions.some((s) => s.method === 'MANUAL') };
     }
     return out;
   }, [punchMap]);
@@ -139,7 +231,7 @@ export default function MyAttendance({ employeeId }) {
       else if (rec && ['PRESENT', 'LATE', 'HALF_DAY'].includes(rec.status)) code = 'P';
       else if (weekend) code = 'DO';
       else if (date < todayStr) code = 'A';
-      out.push({ d, date, dow, code, late: rec?.isLate, manual: rec?.checkIn?.method === 'MANUAL', ot: rec?.overtimeMinutes > 0 });
+      out.push({ d, date, dow, code, late: rec?.isLate, manual: punchStats[date]?.manual || rec?.checkIn?.method === 'MANUAL', ot: rec?.overtimeMinutes > 0 });
     }
     return out;
   }, [data, days, year, month, todayStr, punchStats]);
@@ -217,7 +309,7 @@ export default function MyAttendance({ employeeId }) {
         </div>
       </div>
 
-      {dayModal && <DayDetailModal employeeId={employeeId} date={dayModal} user={user} onClose={() => setDayModal(null)} />}
+      {dayModal && <DayDetailModal employeeId={employeeId} companyId={user?.company} date={dayModal} user={user} onClose={() => setDayModal(null)} onChanged={load} />}
     </>
   );
 }
