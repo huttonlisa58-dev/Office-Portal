@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { User, Briefcase, Calendar, Phone, Mail, MapPin, Hash, BadgeCheck, Users } from 'lucide-react';
 import Loader from '@/components/Loader';
 import { useAuth } from '@/context/AuthContext';
@@ -45,7 +46,10 @@ export default function ProfilePage() {
     <div className="space-y-4">
       {/* banner */}
       <div className="card overflow-hidden p-0">
-        <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-black px-6 pt-8 pb-6">
+        <div className="relative bg-gradient-to-br from-slate-800 via-slate-900 to-black px-6 pt-8 pb-6">
+          <Link href="/profile/details" className="absolute right-5 top-5 rounded-lg bg-sky-500 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white shadow hover:bg-sky-600">
+            View full details
+          </Link>
           <div className="flex flex-wrap items-end gap-4">
             <div className="grid h-24 w-24 place-items-center rounded-full border-4 border-white/10 bg-orange-500 text-3xl font-semibold text-white shadow-lg">
               {initials(name)}

@@ -122,6 +122,9 @@ export const employees = {
       ...mEmp(data),
       dob: data.dob || null, gender: data.gender || null, address: data.address || null,
       dateOfJoining: data.date_of_joining || null,
+      middleName: data.middle_name || null, nickName: data.nick_name || null,
+      bloodGroup: data.blood_group || null, maritalStatus: data.marital_status || null,
+      smoker: data.smoker || false,
       manager: data.manager ? { name: `${data.manager.first_name} ${data.manager.last_name || ''}`.trim(), code: data.manager.employee_code } : null,
     };
   },
