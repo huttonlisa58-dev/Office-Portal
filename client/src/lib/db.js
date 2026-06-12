@@ -487,6 +487,35 @@ export const shifts = {
   },
 };
 
+// ---------- attendance regularization requests ----------
+const mAttReq = (r) => ({
+  _id: r.id, date: r.work_date, checkIn: r.check_in, checkOut: r.check_out,
+  remarks: r.remarks, status: r.status, createdAt: r.created_at, employee: mEmpRef(r.employee),
+});
+export const attendanceReq = {
+  async create({ companyId, employeeId, date, checkIn, checkOut, remarks }) {
+    if (!companyId || !employeeId || !date || !checkIn) throw new Error('Check-in time required');
+    const inAt = new Date(`${date}T${checkIn}:00`);
+    let outAt = checkOut ? new Date(`${date}T${checkOut}:00`) : null;
+    if (outAt && outAt <= inAt) outAt = new Date(outAt.getTime() + 86400000);
+    const { error } = await supabase.from('attendance_requests').insert({
+      company_id: companyId, employee_id: employeeId, work_date: date,
+      check_in: inAt.toISOString(), check_out: outAt ? outAt.toISOString() : null, remarks: remarks || null,
+    });
+    if (error) throw new Error(error.message);
+  },
+  async list() {
+    const { data } = await supabase.from('attendance_requests')
+      .select('*, employee:employees(first_name,last_name,employee_code)')
+      .order('created_at', { ascending: false });
+    return (data || []).map(mAttReq);
+  },
+  async decide(id, decision) {
+    const { error } = await supabase.rpc('decide_attendance_request', { p_request_id: id, p_decision: decision });
+    if (error) throw new Error(error.message);
+  },
+};
+
 // ---------- assets ----------
 export const assets = {
   async list() {

@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Turtle, Hand, Flame, X, Monitor, MapPin, Trash2, Plus, ChevronDown } from 'lucide-react';
-import { attendance as attApi, punch, computeDay, shifts as shiftApi } from '@/lib/db';
+import { attendance as attApi, punch, computeDay, shifts as shiftApi, attendanceReq } from '@/lib/db';
 import { useAuth } from '@/context/AuthContext';
 import Loader from '@/components/Loader';
 
@@ -69,6 +69,8 @@ function DayDetailModal({ employeeId, companyId, date, user, onClose, onChanged 
   const [shift, setShift] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [addInit, setAddInit] = useState(null); // null = closed
+  const [notice, setNotice] = useState('');
+  const canApprove = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR', 'MANAGER'].includes(user?.role);
   const isToday = date === new Date().toISOString().slice(0, 10);
 
   const reload = useCallback(() => {
@@ -94,8 +96,15 @@ function DayDetailModal({ employeeId, companyId, date, user, onClose, onChanged 
   };
   const doAdd = async ({ checkIn, checkOut, remarks }) => {
     setBusy(true);
-    try { await punch.addEntry({ companyId, employeeId, date, checkIn, checkOut, remarks }); setAddInit(null); await reload(); onChanged?.(); }
-    catch (e) { alert(e.message || 'Could not save'); } finally { setBusy(false); }
+    try {
+      if (canApprove) {
+        await punch.addEntry({ companyId, employeeId, date, checkIn, checkOut, remarks });
+        setAddInit(null); await reload(); onChanged?.();
+      } else {
+        await attendanceReq.create({ companyId, employeeId, date, checkIn, checkOut, remarks });
+        setAddInit(null); setNotice('Request HR / Manager ko bhej diya gaya. Approve hone par attendance update hoga.');
+      }
+    } catch (e) { alert(e.message || 'Could not save'); } finally { setBusy(false); }
   };
   const openAdd = (kind) => {
     setMenuOpen(false);
@@ -117,6 +126,8 @@ function DayDetailModal({ employeeId, companyId, date, user, onClose, onChanged 
         </div>
 
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
+          {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">✓ {notice}</div>}
+          {!canApprove && <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-xs text-sky-700 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">Note: aapki manual entry HR / Manager ki approval ke baad attendance mein add hoti hai.</div>}
           <div className="grid grid-cols-2 gap-y-3 text-sm">
             <div><span className="text-slate-400">Name</span><div className="font-medium">{user?.name || '—'}</div></div>
             <div className="text-right"><span className="text-slate-400">Employee id</span><div className="font-medium">{user?.employeeCode || '—'}</div></div>
