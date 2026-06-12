@@ -374,6 +374,8 @@ export const home = {
 export const WORK_TARGET_MS = 8 * 3600 * 1000;   // 8 hours office time
 export const BREAK_TARGET_MS = 1 * 3600 * 1000;  // 1 hour break
 
+const localDate = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 export function computeDay(punches, nowMs = Date.now()) {
   const sorted = [...punches].sort((a, b) => new Date(a.at) - new Date(b.at));
   let workMs = 0, breakMs = 0, openInAt = null, lastOutAt = null;
@@ -394,7 +396,7 @@ export function computeDay(punches, nowMs = Date.now()) {
 export const punch = {
   async today(employeeId) {
     if (!employeeId) return [];
-    const date = new Date().toISOString().slice(0, 10);
+    const date = localDate();
     const { data } = await supabase.from('attendance_punches')
       .select('*').eq('employee_id', employeeId).eq('work_date', date)
       .order('punched_at', { ascending: true });
@@ -407,10 +409,18 @@ export const punch = {
       .order('punched_at', { ascending: true });
     return (data || []).map((p) => ({ _id: p.id, at: p.punched_at, type: p.type, method: p.method }));
   },
+  async month(employeeId, start, end) {
+    if (!employeeId) return {};
+    const { data } = await supabase.from('attendance_punches')
+      .select('work_date,type,punched_at').eq('employee_id', employeeId)
+      .gte('work_date', start).lte('work_date', end).order('punched_at', { ascending: true });
+    const byDate = {};
+    (data || []).forEach((p) => { (byDate[p.work_date] ||= []).push({ at: p.punched_at, type: p.type }); });
+    return byDate;
+  },
   async toggle(companyId, employeeId, type) {
     const { error } = await supabase.from('attendance_punches').insert({
-      company_id: companyId, employee_id: employeeId, type,
-      work_date: new Date().toISOString().slice(0, 10),
+      company_id: companyId, employee_id: employeeId, type, work_date: localDate(),
     });
     if (error) throw new Error(error.message);
   },

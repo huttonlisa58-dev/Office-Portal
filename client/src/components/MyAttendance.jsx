@@ -92,17 +92,36 @@ export default function MyAttendance({ employeeId }) {
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [data, setData] = useState(null);
+  const [punchMap, setPunchMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [dayModal, setDayModal] = useState(null);
 
   useEffect(() => {
     if (!employeeId) { setLoading(false); return; }
     setLoading(true);
-    attApi.mine(employeeId, year, month).then(setData).catch(() => setData(null)).finally(() => setLoading(false));
+    const last = new Date(year, month + 1, 0).getDate();
+    const start = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const end = `${year}-${String(month + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
+    Promise.all([attApi.mine(employeeId, year, month), punch.month(employeeId, start, end)])
+      .then(([d, pm]) => { setData(d); setPunchMap(pm || {}); })
+      .catch(() => { setData(null); setPunchMap({}); })
+      .finally(() => setLoading(false));
   }, [employeeId, year, month]);
 
   const days = useMemo(() => new Date(Date.UTC(year, month + 1, 0)).getUTCDate(), [year, month]);
-  const todayStr = now.toISOString().slice(0, 10);
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+  const punchStats = useMemo(() => {
+    const out = {};
+    for (const [date, sessions] of Object.entries(punchMap)) {
+      if (!sessions.length) continue;
+      const day = computeDay(sessions, Date.now());
+      const ins = sessions.filter((s) => s.type === 'IN').map((s) => s.at);
+      const outs = sessions.filter((s) => s.type === 'OUT').map((s) => s.at);
+      out[date] = { workMin: Math.floor(day.workMs / 60000), first: ins[0] || null, last: outs[outs.length - 1] || null };
+    }
+    return out;
+  }, [punchMap]);
 
   const cells = useMemo(() => {
     const byDate = new Map();
@@ -116,17 +135,18 @@ export default function MyAttendance({ employeeId }) {
       const rec = byDate.get(date);
       let code = '';
       if (hol.has(date)) code = 'H';
+      else if (punchStats[date]) code = 'P';
       else if (rec && ['PRESENT', 'LATE', 'HALF_DAY'].includes(rec.status)) code = 'P';
       else if (weekend) code = 'DO';
       else if (date < todayStr) code = 'A';
       out.push({ d, date, dow, code, late: rec?.isLate, manual: rec?.checkIn?.method === 'MANUAL', ot: rec?.overtimeMinutes > 0 });
     }
     return out;
-  }, [data, days, year, month, todayStr]);
+  }, [data, days, year, month, todayStr, punchStats]);
 
-  const firstLast = useMemo(() => (data?.rows || []).filter((r) => r.checkIn).map((r) => ({
-    date: r.date, first: r.checkIn?.time, last: r.checkOut?.time, total: r.workedMinutes,
-  })).reverse(), [data]);
+  const firstLast = useMemo(() => Object.entries(punchStats)
+    .map(([date, st]) => ({ date, first: st.first, last: st.last, total: st.workMin }))
+    .sort((a, b) => b.date.localeCompare(a.date)), [punchStats]);
 
   const go = (delta) => { let m = month + delta, y = year; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } setMonth(m); setYear(y); };
 
