@@ -5,7 +5,7 @@ import { HelpCircle, ChevronDown, Clock, CalendarCheck, Plane, Wallet, Users, Bo
 import PageBanner from '@/components/PageBanner';
 
 const FAQS = [
-  { q: 'Main check-in / check-out kaise karun?', a: 'Top bar mein "CHECK IN" button dabaayein. Timer chालu ho jayega aur 8 ghante ka office-time track hota hai. Dobara dabaane par CHECK OUT ho jata hai. Multiple sessions support hain — lunch ke baad wapas check-in kar sakte hain.' },
+  { q: 'Main check-in / check-out kaise karun?', a: 'Top bar mein "CHECK IN" button dabaayein. Timer chaalu ho jayega aur 8 ghante ka office-time track hota hai. Dobara dabaane par CHECK OUT ho jata hai. Multiple sessions support hain — lunch ke baad wapas check-in kar sakte hain.' },
   { q: 'Leave kaise apply karun?', a: 'Leave tracker → My leaves → "Apply leave". Type, dates aur reason bhar ke submit karein. HR/Manager ko notification chala jata hai; approve hone par aapko bhi alert milta hai.' },
   { q: 'Apni shift / roster kaha dekhun?', a: 'Attendance tracker → My shift. Monthly calendar mein har din ki shift timing aur weekly off (Day off) dikhta hai.' },
   { q: 'Reports kaise nikaalun?', a: 'Reports section mein jaayein — My Check-in/Check-out, Entry/Exit aur My leave summary available hain. Month change karke data dekh sakte hain.' },
