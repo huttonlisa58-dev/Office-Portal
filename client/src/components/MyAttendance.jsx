@@ -15,6 +15,7 @@ const clock = (d) => d ? new Date(d).toLocaleTimeString([], { hour: '2-digit', m
 
 const CODE = {
   P: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+  PEND: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
   A: 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300',
   DO: 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500',
   H: 'bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300',
@@ -62,7 +63,7 @@ function AddEntryModal({ initial, onSave, onCancel, busy }) {
   );
 }
 
-function DayDetailModal({ employeeId, companyId, date, user, onClose, onChanged }) {
+function DayDetailModal({ employeeId, companyId, date, user, onClose, onChanged, pending }) {
   const [punches, setPunches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -84,7 +85,7 @@ function DayDetailModal({ employeeId, companyId, date, user, onClose, onChanged 
   const day = computeDay(punches, nowMs);
   const sessions = useMemo(() => buildSessions(punches), [punches]);
   const dObj = new Date(date + 'T00:00:00');
-  const status = day.workMs > 0 ? (day.open && isToday ? 'Working' : 'Present') : (date < new Date().toISOString().slice(0, 10) ? 'Absent' : 'Pending');
+  const status = pending ? 'Pending approval' : (day.workMs > 0 ? (day.open && isToday ? 'Working' : 'Present') : (date < new Date().toISOString().slice(0, 10) ? 'Absent' : 'Pending'));
   const firstIn = sessions.find((s) => s.inAt)?.inAt || null;
   const lastOut = [...sessions].reverse().find((s) => s.outAt)?.outAt || null;
   const hhmmShift = (t) => t ? String(t).slice(0, 5) : '';
@@ -102,7 +103,7 @@ function DayDetailModal({ employeeId, companyId, date, user, onClose, onChanged 
         setAddInit(null); await reload(); onChanged?.();
       } else {
         await attendanceReq.create({ companyId, employeeId, date, checkIn, checkOut, remarks });
-        setAddInit(null); setNotice('Request HR / Manager ko bhej diya gaya. Approve hone par attendance update hoga.');
+        setAddInit(null); setNotice('Request sent to HR / Manager. Your attendance will update once it is approved.'); onChanged?.();
       }
     } catch (e) { alert(e.message || 'Could not save'); } finally { setBusy(false); }
   };
@@ -127,7 +128,7 @@ function DayDetailModal({ employeeId, companyId, date, user, onClose, onChanged 
 
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
           {notice && <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-300">✓ {notice}</div>}
-          {!canApprove && <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-xs text-sky-700 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">Note: aapki manual entry HR / Manager ki approval ke baad attendance mein add hoti hai.</div>}
+          {!canApprove && <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-xs text-sky-700 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">Note: your manual entry is added to attendance only after HR / Manager approval.</div>}
           <div className="grid grid-cols-2 gap-y-3 text-sm">
             <div><span className="text-slate-400">Name</span><div className="font-medium">{user?.name || '—'}</div></div>
             <div className="text-right"><span className="text-slate-400">Employee id</span><div className="font-medium">{user?.employeeCode || '—'}</div></div>
@@ -195,6 +196,7 @@ export default function MyAttendance({ employeeId }) {
   const [month, setMonth] = useState(now.getMonth());
   const [data, setData] = useState(null);
   const [punchMap, setPunchMap] = useState({});
+  const [pendingDates, setPendingDates] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [dayModal, setDayModal] = useState(null);
 
@@ -204,11 +206,15 @@ export default function MyAttendance({ employeeId }) {
     const last = new Date(year, month + 1, 0).getDate();
     const start = `${year}-${String(month + 1).padStart(2, '0')}-01`;
     const end = `${year}-${String(month + 1).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
-    Promise.all([attApi.mine(employeeId, year, month), punch.month(employeeId, start, end)])
-      .then(([d, pm]) => { setData(d); setPunchMap(pm || {}); })
-      .catch(() => { setData(null); setPunchMap({}); })
+    Promise.all([attApi.mine(employeeId, year, month), punch.month(employeeId, start, end), attendanceReq.list().catch(() => [])])
+      .then(([d, pm, reqs]) => {
+        setData(d); setPunchMap(pm || {});
+        const mine = (reqs || []).filter((r) => r.status === 'PENDING' && (!user?.employeeCode || r.employee?.employeeId === user.employeeCode) && r.date >= start && r.date <= end);
+        setPendingDates(new Set(mine.map((r) => r.date)));
+      })
+      .catch(() => { setData(null); setPunchMap({}); setPendingDates(new Set()); })
       .finally(() => setLoading(false));
-  }, [employeeId, year, month]);
+  }, [employeeId, year, month, user?.employeeCode]);
   useEffect(() => { load(); }, [load]);
 
   const days = useMemo(() => new Date(Date.UTC(year, month + 1, 0)).getUTCDate(), [year, month]);
@@ -238,6 +244,7 @@ export default function MyAttendance({ employeeId }) {
       const rec = byDate.get(date);
       let code = '';
       if (hol.has(date)) code = 'H';
+      else if (pendingDates.has(date)) code = 'PEND';
       else if (punchStats[date]) code = 'P';
       else if (rec && ['PRESENT', 'LATE', 'HALF_DAY'].includes(rec.status)) code = 'P';
       else if (weekend) code = 'DO';
@@ -245,7 +252,7 @@ export default function MyAttendance({ employeeId }) {
       out.push({ d, date, dow, code, late: rec?.isLate, manual: punchStats[date]?.manual || rec?.checkIn?.method === 'MANUAL', ot: rec?.overtimeMinutes > 0 });
     }
     return out;
-  }, [data, days, year, month, todayStr, punchStats]);
+  }, [data, days, year, month, todayStr, punchStats, pendingDates]);
 
   const firstLast = useMemo(() => Object.entries(punchStats)
     .map(([date, st]) => ({ date, first: st.first, last: st.last, total: st.workMin }))
@@ -270,8 +277,8 @@ export default function MyAttendance({ employeeId }) {
           <span className="inline-flex items-center gap-1"><Turtle size={14} className="text-rose-500" /> Late entry</span>
           <span className="inline-flex items-center gap-1"><Hand size={14} className="text-sky-500" /> Manual entry</span>
           <span className="inline-flex items-center gap-1"><Flame size={14} className="text-orange-500" /> OT (Overtime)</span>
-          <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-rose-400" /> Pending</span>
-          <span className="ml-auto text-slate-400">Tip: kisi din pe click karke detail dekho</span>
+          <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-amber-400" /> Pending approval</span>
+          <span className="ml-auto text-slate-400">Tip: click a day to see details</span>
         </div>
         {loading ? <Loader /> : (
           <div className="overflow-x-auto px-3 pb-4">
@@ -283,7 +290,7 @@ export default function MyAttendance({ employeeId }) {
                     <div className="text-[10px] text-slate-400">{MONTHS[month].slice(0, 3)} {String(c.d).padStart(2, '0')}</div>
                   </div>
                   <div className={`grid h-12 place-items-center text-xs font-bold ${CODE[c.code] || ''}`}>
-                    <div>{c.code}</div>
+                    <div>{c.code === 'PEND' ? <span className="text-[9px] font-semibold leading-none">Pending</span> : c.code}</div>
                     <div className="flex gap-0.5">
                       {c.late && <Turtle size={11} className="text-rose-500" />}
                       {c.manual && <Hand size={11} className="text-sky-500" />}
@@ -320,7 +327,7 @@ export default function MyAttendance({ employeeId }) {
         </div>
       </div>
 
-      {dayModal && <DayDetailModal employeeId={employeeId} companyId={user?.company} date={dayModal} user={user} onClose={() => setDayModal(null)} onChanged={load} />}
+      {dayModal && <DayDetailModal employeeId={employeeId} companyId={user?.company} date={dayModal} user={user} pending={pendingDates.has(dayModal)} onClose={() => setDayModal(null)} onChanged={load} />}
     </>
   );
 }
