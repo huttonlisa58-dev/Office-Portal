@@ -194,7 +194,7 @@ export const attendance = {
 // ---------- leaves ----------
 export const leaves = {
   async list() {
-    const { data } = await supabase.from('leaves').select('*, employee:employees(first_name,last_name,employee_code)').order('created_at', { ascending: false });
+    const { data } = await supabase.from('leaves').select('*, employee:employees!leaves_employee_id_fkey(first_name,last_name,employee_code)').order('created_at', { ascending: false });
     return (data || []).map(mLeave);
   },
   async balance(employeeId) {
