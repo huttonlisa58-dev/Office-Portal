@@ -1,13 +1,17 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Turtle, Hand, Flame } from 'lucide-react';
-import { attendance as attApi } from '@/lib/db';
+import { useEffect, useMemo, useState, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, Turtle, Hand, Flame, X, Monitor, MapPin } from 'lucide-react';
+import { attendance as attApi, punch, computeDay } from '@/lib/db';
+import { useAuth } from '@/context/AuthContext';
 import Loader from '@/components/Loader';
 
 const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const WDF = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const fmtTime = (t) => t ? new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
 const fmtDur = (m) => m ? `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00` : '—';
+const hhmm = (ms) => { const mins = Math.max(0, Math.floor(ms / 60000)); return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`; };
+const clock = (d) => d ? new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
 
 const CODE = {
   P: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
@@ -17,12 +21,79 @@ const CODE = {
   '': 'text-slate-300',
 };
 
+function DayDetailModal({ employeeId, date, user, onClose }) {
+  const [punches, setPunches] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const isToday = date === new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    let on = true;
+    punch.forDate(employeeId, date).then((p) => { if (on) setPunches(p); }).catch(() => {}).finally(() => { if (on) setLoading(false); });
+    return () => { on = false; };
+  }, [employeeId, date]);
+
+  const nowMs = isToday ? Date.now() : (punches.length ? new Date(punches[punches.length - 1].at).getTime() : Date.now());
+  const day = computeDay(punches, nowMs);
+  const dObj = new Date(date + 'T00:00:00');
+  const status = day.workMs > 0 ? (day.open && isToday ? 'Working' : 'Present') : (date < new Date().toISOString().slice(0, 10) ? 'Absent' : 'Pending');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-end bg-black/40" onClick={onClose}>
+      <div className="h-full w-full max-w-xl overflow-y-auto bg-white shadow-2xl dark:bg-slate-900" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between bg-sky-500 px-6 py-4 text-white">
+          <h2 className="text-lg font-semibold">Check-in / Check-out</h2>
+          <button onClick={onClose} className="rounded p-1 hover:bg-white/20"><X size={20} /></button>
+        </div>
+
+        <div className="space-y-4 p-6">
+          <div className="grid grid-cols-2 gap-y-3 text-sm">
+            <div><span className="text-slate-400">Name</span><div className="font-medium">{user?.name || '—'}</div></div>
+            <div className="text-right"><span className="text-slate-400">Employee id</span><div className="font-medium">{user?.employeeCode || '—'}</div></div>
+            <div><span className="text-slate-400">Date</span><div className="font-medium">{dObj.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}</div></div>
+            <div className="text-right"><span className="text-slate-400">Day</span><div className="font-medium">{WDF[dObj.getDay()]}</div></div>
+            <div><span className="text-slate-400">Total in-time</span><div className="font-semibold text-sky-600">{hhmm(day.workMs)}</div></div>
+            <div className="text-right"><span className="text-slate-400">Total out-time (break)</span><div className="font-semibold text-amber-600">{hhmm(day.breakMs)}</div></div>
+            <div><span className="text-slate-400">Status</span><div className="font-medium">{status}</div></div>
+            <div className="text-right"><span className="text-slate-400">Sessions</span><div className="font-medium">{day.sessions.length}</div></div>
+          </div>
+
+          <div className="rounded-xl border dark:border-slate-700">
+            <div className="grid grid-cols-2 border-b px-4 py-2.5 text-sm font-medium text-slate-500 dark:border-slate-700">
+              <div>Check-in</div><div>Check-out</div>
+            </div>
+            {loading ? <div className="p-6"><Loader /></div> : day.sessions.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-slate-400">No check-in / check-out records for this day.</div>
+            ) : day.sessions.map((s, i) => (
+              <div key={i} className="grid grid-cols-2 border-b px-4 py-3 text-sm last:border-0 dark:border-slate-700">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2"><Monitor size={14} className="text-slate-400" /> {clock(s.in)} <span className="text-xs text-slate-400">(W)</span></div>
+                  <div className="flex items-center gap-2 text-xs text-slate-400"><MapPin size={12} /> NA</div>
+                </div>
+                <div className="space-y-1">
+                  {s.out ? (<>
+                    <div className="flex items-center gap-2"><Monitor size={14} className="text-slate-400" /> {clock(s.out)} <span className="text-xs text-slate-400">(W)</span></div>
+                    <div className="flex items-center gap-2 text-xs text-slate-400"><MapPin size={12} /> NA</div>
+                  </>) : <span className="text-xs text-emerald-600">in progress…</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <button onClick={onClose} className="w-full rounded-xl bg-slate-100 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function MyAttendance({ employeeId }) {
+  const { user } = useAuth();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [dayModal, setDayModal] = useState(null);
 
   useEffect(() => {
     if (!employeeId) { setLoading(false); return; }
@@ -77,12 +148,13 @@ export default function MyAttendance({ employeeId }) {
           <span className="inline-flex items-center gap-1"><Hand size={14} className="text-sky-500" /> Manual entry</span>
           <span className="inline-flex items-center gap-1"><Flame size={14} className="text-orange-500" /> OT (Overtime)</span>
           <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-sm bg-rose-400" /> Pending</span>
+          <span className="ml-auto text-slate-400">Tip: kisi din pe click karke detail dekho</span>
         </div>
         {loading ? <Loader /> : (
           <div className="overflow-x-auto px-3 pb-4">
             <div className="flex">
               {cells.map((c) => (
-                <div key={c.d} className="min-w-[58px] border-l first:border-l-0">
+                <button key={c.d} onClick={() => setDayModal(c.date)} className="min-w-[58px] border-l text-left transition hover:bg-sky-50 first:border-l-0 dark:hover:bg-slate-800">
                   <div className={`px-1 py-2 text-center ${c.dow === 0 || c.dow === 6 ? 'bg-slate-50 dark:bg-slate-800/50' : ''}`}>
                     <div className="text-[11px] font-medium text-slate-500">{WD[c.dow]}</div>
                     <div className="text-[10px] text-slate-400">{MONTHS[month].slice(0, 3)} {String(c.d).padStart(2, '0')}</div>
@@ -95,7 +167,7 @@ export default function MyAttendance({ employeeId }) {
                       {c.ot && <Flame size={11} className="text-orange-500" />}
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           </div>
@@ -124,6 +196,8 @@ export default function MyAttendance({ employeeId }) {
           </table>
         </div>
       </div>
+
+      {dayModal && <DayDetailModal employeeId={employeeId} date={dayModal} user={user} onClose={() => setDayModal(null)} />}
     </>
   );
 }

@@ -400,6 +400,13 @@ export const punch = {
       .order('punched_at', { ascending: true });
     return (data || []).map((p) => ({ _id: p.id, at: p.punched_at, type: p.type, method: p.method }));
   },
+  async forDate(employeeId, date) {
+    if (!employeeId || !date) return [];
+    const { data } = await supabase.from('attendance_punches')
+      .select('*').eq('employee_id', employeeId).eq('work_date', date)
+      .order('punched_at', { ascending: true });
+    return (data || []).map((p) => ({ _id: p.id, at: p.punched_at, type: p.type, method: p.method }));
+  },
   async toggle(companyId, employeeId, type) {
     const { error } = await supabase.from('attendance_punches').insert({
       company_id: companyId, employee_id: employeeId, type,

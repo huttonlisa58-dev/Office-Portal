@@ -27,8 +27,8 @@ export default function AttendancePage() {
       )}
       {view === 'team' ? <TeamAttendanceGrid /> : (
         <>
-          <CheckInOutCard employeeId={user?.employee} companyId={user?.company} />
           <MyAttendance employeeId={user?.employee} />
+          <CheckInOutCard employeeId={user?.employee} companyId={user?.company} />
         </>
       )}
     </>

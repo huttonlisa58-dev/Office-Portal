@@ -45,27 +45,24 @@ export default function ProfilePage() {
     <div className="space-y-4">
       {/* banner */}
       <div className="card overflow-hidden p-0">
-        <div className="relative h-28 bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900" />
-        <div className="px-6 pb-5">
-          <div className="-mt-12 flex flex-wrap items-end justify-between gap-4">
-            <div className="flex items-end gap-4">
-              <div className="grid h-24 w-24 place-items-center rounded-full border-4 border-white bg-orange-500 text-3xl font-semibold text-white dark:border-slate-900">
-                {initials(name)}
-              </div>
-              <div className="pb-1">
-                <h1 className="text-2xl font-semibold">{name}</h1>
-                <p className="text-sm text-slate-400">{code ? `${code} · ` : ''}{user?.role?.replace('_', ' ').toLowerCase()}</p>
-              </div>
+        <div className="bg-gradient-to-br from-slate-800 via-slate-900 to-black px-6 pt-8 pb-6">
+          <div className="flex flex-wrap items-end gap-4">
+            <div className="grid h-24 w-24 place-items-center rounded-full border-4 border-white/10 bg-orange-500 text-3xl font-semibold text-white shadow-lg">
+              {initials(name)}
+            </div>
+            <div className="pb-1">
+              <h1 className="text-2xl font-semibold text-white">{name}</h1>
+              <p className="text-sm text-slate-300">{code ? `${code} · ` : ''}{user?.role?.replace('_', ' ').toLowerCase()}</p>
             </div>
           </div>
-          <div className="mt-5 flex gap-6 border-b text-sm dark:border-slate-700">
-            {TABS.map((t) => (
-              <button key={t} onClick={() => setTab(t)}
-                className={`-mb-px border-b-2 pb-2.5 font-medium transition ${tab === t ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                {t}
-              </button>
-            ))}
-          </div>
+        </div>
+        <div className="flex gap-6 border-b px-6 text-sm dark:border-slate-700">
+          {TABS.map((t) => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`border-b-2 py-3 font-medium transition ${tab === t ? 'border-sky-500 text-sky-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
+              {t}
+            </button>
+          ))}
         </div>
       </div>
 
