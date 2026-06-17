@@ -40,7 +40,7 @@ export async function getMe() {
   }
   if (profile?.company_id) {
     const { data: c } = await supabase.from('companies').select('*').eq('id', profile.company_id).single();
-    company = c && { ...mCompany(c), timezone: c.timezone, workSettings: { workdayStart: c.workday_start, lateAfterMinutes: c.late_after_minutes, fullDayHours: c.full_day_hours } };
+    company = c && { ...mCompany(c), logo: c.logo || null, timezone: c.timezone, workSettings: { workdayStart: c.workday_start, lateAfterMinutes: c.late_after_minutes, fullDayHours: c.full_day_hours } };
   }
   return {
     user: { id: user.id, name: profile?.full_name, email: profile?.email, role: profile?.role, employee: profile?.employee_id, employeeCode, company: profile?.company_id },
@@ -119,6 +119,13 @@ export const employees = {
     return { items: (data || []).map(mEmp), total: count || 0, page, pages: Math.max(1, Math.ceil((count || 0) / limit)) };
   },
   create: (payload) => invoke('create-employee', payload),
+  updateLogin: (payload) => invoke('update-employee-login', payload),
+  async fullProfile(id) {
+    if (!id) return null;
+    const { data, error } = await supabase.rpc('employee_full_profile', { p_id: id });
+    if (error) throw new Error(error.message);
+    return data;
+  },
   async getOne(id) {
     if (!id) return null;
     const { data } = await supabase.from('employees')

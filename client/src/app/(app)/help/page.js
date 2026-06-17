@@ -5,13 +5,13 @@ import { HelpCircle, ChevronDown, Clock, CalendarCheck, Plane, Wallet, Users, Bo
 import PageBanner from '@/components/PageBanner';
 
 const FAQS = [
-  { q: 'Main check-in / check-out kaise karun?', a: 'Top bar mein "CHECK IN" button dabaayein. Timer chaalu ho jayega aur 8 ghante ka office-time track hota hai. Dobara dabaane par CHECK OUT ho jata hai. Multiple sessions support hain — lunch ke baad wapas check-in kar sakte hain.' },
-  { q: 'Leave kaise apply karun?', a: 'Leave tracker → My leaves → "Apply leave". Type, dates aur reason bhar ke submit karein. HR/Manager ko notification chala jata hai; approve hone par aapko bhi alert milta hai.' },
-  { q: 'Apni shift / roster kaha dekhun?', a: 'Attendance tracker → My shift. Monthly calendar mein har din ki shift timing aur weekly off (Day off) dikhta hai.' },
-  { q: 'Reports kaise nikaalun?', a: 'Reports section mein jaayein — My Check-in/Check-out, Entry/Exit aur My leave summary available hain. Month change karke data dekh sakte hain.' },
-  { q: 'Apni poori profile kaha hai?', a: 'Top-right avatar → My Profile, phir "View full details". Wahan Primary information, Work information aur baaki sections hain.' },
-  { q: 'Naya employee kaise add karun? (HR/Admin)', a: 'Employees → "Add employee". Basic, Personal aur Work details bharein. Email dene par login automatically ban jata hai (default password Welcome@123).' },
-  { q: 'Password change kaise karun?', a: 'Pehli baar login default password se hota hai. Settings se ya aap apne account provider se password reset kar sakte hain. HR aapke liye temporary password bhi set kar sakta hai.' },
+  { q: 'How do I check in / check out?', a: 'Press the "CHECK IN" button in the top bar. A timer starts and tracks your 8 hours of office time. Pressing it again checks you out. Multiple sessions are supported — you can check back in after lunch.' },
+  { q: 'How do I apply for leave?', a: 'Go to Leave tracker → My leaves → "Apply leave". Fill in the type, dates and reason, then submit. Your HR/manager gets a notification, and you receive an alert once it is approved.' },
+  { q: 'Where can I see my shift / roster?', a: 'Go to Attendance tracker → My shift. The monthly calendar shows each day\u2019s shift timing and your weekly off (Day off).' },
+  { q: 'How do I pull reports?', a: 'Open the Reports section — My Check-in/Check-out, Entry/Exit and My leave summary are available. Change the month to view data for a different period.' },
+  { q: 'Where is my full profile?', a: 'Top-right avatar → My Profile, then "View full details". You\u2019ll find Primary information, Work information and the other sections there.' },
+  { q: 'How do I add a new employee? (HR/Admin)', a: 'Go to Employees → "Add employee". Fill in the Basic, Personal and Work details. Adding an email automatically creates a login (default password Welcome@123).' },
+  { q: 'How do I change my password?', a: 'Your first login uses the default password. You can reset your password from Settings or through your account provider. HR can also set a temporary password for you.' },
 ];
 
 const GUIDE = [
@@ -20,7 +20,7 @@ const GUIDE = [
   { icon: Plane, label: 'Leave tracker', href: '/leaves', note: 'Leaves, holidays, rollover, comp-off' },
   { icon: Wallet, label: 'Payroll', href: '/payroll', note: 'Salary, expenses & assets' },
   { icon: Users, label: 'Employees', href: '/employees', note: 'Directory & org chart' },
-  { icon: Bot, label: 'AI Assistant', href: '/assistant', note: 'Sawaal poochhein, madad lein' },
+  { icon: Bot, label: 'AI Assistant', href: '/assistant', note: 'Ask questions, get help' },
 ];
 
 function Faq({ q, a }) {
@@ -65,7 +65,7 @@ export default function HelpPage() {
 
           <div className="card p-5">
             <div className="mb-2 flex items-center gap-2 text-sm font-semibold"><Mail size={16} className="text-sky-500" /> Need more help?</div>
-            <p className="text-sm text-slate-500">Apne HR ya admin se Inbox ke through sampark karein, ya AI Assistant se poochhein.</p>
+            <p className="text-sm text-slate-500">Reach out to your HR or admin through the Inbox, or ask the AI Assistant.</p>
             <Link href="/assistant" className="btn-primary mt-3 inline-flex w-full justify-center">Ask AI Assistant</Link>
           </div>
         </div>

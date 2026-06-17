@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { LogIn, LogOut, Clock, Coffee, Monitor } from 'lucide-react';
+import { Clock, Coffee, Monitor } from 'lucide-react';
 import { punch, computeDay, WORK_TARGET_MS, BREAK_TARGET_MS } from '@/lib/db';
 
 const hms = (ms) => {
@@ -16,15 +16,13 @@ const hm = (ms) => {
 };
 const time = (d) => d ? new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
 
-export default function CheckInOutCard({ employeeId, companyId }) {
+export default function CheckInOutCard({ employeeId }) {
   const [punches, setPunches] = useState([]);
-  const [loaded, setLoaded] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
 
   const refresh = useCallback(async () => {
-    if (!employeeId) { setLoaded(true); return; }
-    try { setPunches(await punch.today(employeeId)); } catch { /* ignore */ } finally { setLoaded(true); }
+    if (!employeeId) return;
+    try { setPunches(await punch.today(employeeId)); } catch { /* ignore */ }
   }, [employeeId]);
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -36,12 +34,6 @@ export default function CheckInOutCard({ employeeId, companyId }) {
   }, [day.open]);
 
   if (!employeeId) return null;
-
-  const doPunch = async () => {
-    setBusy(true);
-    try { await punch.toggle(companyId, employeeId, day.open ? 'OUT' : 'IN'); await refresh(); }
-    catch (e) { alert(e.message || 'Could not record'); } finally { setBusy(false); }
-  };
 
   const workPct = Math.min(100, (day.workMs / WORK_TARGET_MS) * 100);
   const breakPct = Math.min(100, (day.breakMs / BREAK_TARGET_MS) * 100);
@@ -56,14 +48,7 @@ export default function CheckInOutCard({ employeeId, companyId }) {
           <div className="text-sm font-semibold">Check-in / Check-out</div>
           <div className="text-xs text-slate-400">{today}</div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className={`badge ${day.open ? 'bg-emerald-50 text-emerald-700' : day.count > 0 ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>{status}</span>
-          <button onClick={doPunch} disabled={busy || !loaded}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold tracking-wide text-white transition disabled:opacity-60 ${day.open ? 'bg-rose-500 hover:bg-rose-600' : 'bg-sky-500 hover:bg-sky-600'}`}>
-            {day.open ? <LogOut size={16} /> : <LogIn size={16} />}
-            {busy ? '…' : day.open ? 'CHECK OUT' : 'CHECK IN'}
-          </button>
-        </div>
+        <span className={`badge ${day.open ? 'bg-emerald-50 text-emerald-700' : day.count > 0 ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>{status}</span>
       </div>
 
       {/* targets */}
@@ -98,7 +83,7 @@ export default function CheckInOutCard({ employeeId, companyId }) {
         <div className="mb-2 grid grid-cols-2 text-xs font-medium text-slate-400">
           <div>Check-in</div><div>Check-out</div>
         </div>
-        {day.sessions.length === 0 && <div className="py-3 text-sm text-slate-400">No punches yet today. Tap CHECK IN to start.</div>}
+        {day.sessions.length === 0 && <div className="py-3 text-sm text-slate-400">No punches yet today. Use the CHECK IN button in the top bar to start.</div>}
         {day.sessions.map((s, i) => (
           <div key={i} className="grid grid-cols-2 border-t py-2.5 text-sm first:border-0 dark:border-slate-700">
             <div className="flex items-center gap-2"><Monitor size={14} className="text-slate-400" /> {time(s.in)} <span className="text-xs text-slate-400">(W)</span></div>

@@ -69,7 +69,12 @@ export default function Sidebar({ open, onClose }) {
       )}>
         <div className="flex items-start justify-between gap-2 px-4 py-4">
           <Link href="/dashboard" className="flex items-start gap-2.5">
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-sm font-extrabold text-brand-600">{company?.name ? company.name[0] : 'H'}</div>
+            {company?.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={company.logo} alt={company?.name || 'Company'} className="h-9 w-9 shrink-0 rounded-lg bg-white object-contain p-0.5" />
+            ) : (
+              <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-sm font-extrabold text-brand-600">{company?.name ? company.name[0] : 'H'}</div>
+            )}
             <span className="text-sm font-semibold leading-tight text-white">{company?.name || 'HRMS Platform'}</span>
           </Link>
           <button className="rounded-lg p-1 text-slate-400 hover:bg-white/10 lg:hidden" onClick={onClose}><X size={18} /></button>

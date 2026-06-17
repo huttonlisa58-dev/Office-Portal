@@ -41,7 +41,7 @@ export default function LeaveRolloverPage() {
         <div className="space-y-4">
           <div className="flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-200">
             <Info size={18} className="mt-0.5 shrink-0" />
-            <p>Year-end ({year} → {year + 1}) par unused leaves is policy ke hisaab se carry-forward hote hain. Earned & Sick aage jate hain (cap ke saath), Casual lapse ho jata hai.</p>
+            <p>At year-end ({year} → {year + 1}), unused leaves carry forward according to this policy. Earned & Sick leave carry over (subject to their caps), while Casual leave lapses.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
