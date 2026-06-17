@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   Building2, Users, UserCog, Cake, UserPlus, CalendarDays, Plane, UserMinus, GripVertical, Rss, LayoutGrid, Megaphone,
 } from 'lucide-react';
@@ -44,15 +45,25 @@ function Widget({ icon: Icon, title, children }) {
     </div>
   );
 }
-function Person({ i, name, sub, meta }) {
+function Person({ i, name, sub, meta, id }) {
+  const avatar = <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-semibold text-white ${AVA[i % AVA.length]}`}>{initials(name)}</div>;
+  const body = (
+    <div className="min-w-0 flex-1">
+      <div className="truncate text-sm font-medium">{name}</div>
+      {sub && <div className="truncate text-xs text-slate-400">{sub}</div>}
+    </div>
+  );
+  const metaEl = meta && <div className="shrink-0 text-xs text-slate-400">{meta}</div>;
+  if (id) {
+    return (
+      <Link href={`/employees/${id}`} className="-mx-2 flex items-center gap-3 rounded-lg px-2 py-2 transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
+        {avatar}{body}{metaEl}
+      </Link>
+    );
+  }
   return (
     <div className="flex items-center gap-3 py-2">
-      <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-full text-xs font-semibold text-white ${AVA[i % AVA.length]}`}>{initials(name)}</div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">{name}</div>
-        {sub && <div className="truncate text-xs text-slate-400">{sub}</div>}
-      </div>
-      {meta && <div className="shrink-0 text-xs text-slate-400">{meta}</div>}
+      {avatar}{body}{metaEl}
     </div>
   );
 }
@@ -98,15 +109,15 @@ function Company({ name, profile }) {
         loading ? <Loader /> : !data ? <div className="card p-8 text-center text-slate-500">Could not load dashboard.</div> : (
           <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
             <Widget icon={Cake} title="Birthday">
-              {data.birthdays.length ? data.birthdays.map((p, i) => <Person key={p.id} i={i} name={p.name} sub={p.role} meta={fmtDate(p.date)} />) : <Empty text="No upcoming birthdays." />}
+              {data.birthdays.length ? data.birthdays.map((p, i) => <Person key={p.id} i={i} id={p.id} name={p.name} sub={p.role} meta={fmtDate(p.date)} />) : <Empty text="No upcoming birthdays." />}
             </Widget>
 
             <Widget icon={UserPlus} title="New joiners">
-              {data.newJoiners.length ? data.newJoiners.map((p, i) => <Person key={p.id} i={i} name={p.name} sub={p.role} meta={fmtDate(p.date)} />) : <Empty text="No new joiners in the last 30 days." />}
+              {data.newJoiners.length ? data.newJoiners.map((p, i) => <Person key={p.id} i={i} id={p.id} name={p.name} sub={p.role} meta={fmtDate(p.date)} />) : <Empty text="No new joiners in the last 30 days." />}
             </Widget>
 
             <Widget icon={Users} title="Department members">
-              {data.departmentMembers.length ? data.departmentMembers.map((p, i) => <Person key={p.id} i={i} name={p.name} sub={p.role} />) : <Empty text="No department members yet." />}
+              {data.departmentMembers.length ? data.departmentMembers.map((p, i) => <Person key={p.id} i={i} id={p.id} name={p.name} sub={p.role} />) : <Empty text="No department members yet." />}
             </Widget>
 
             <Widget icon={CalendarDays} title="Upcoming holidays">
