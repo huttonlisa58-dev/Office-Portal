@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home, Users, Mail, Clock, CalendarCheck, Plane, Wallet, Activity,
-  BarChart3, HelpCircle, Phone, Lock, ChevronRight, X, Bot, Building2, Settings,
+  BarChart3, HelpCircle, Phone, Lock, ChevronRight, X, Bot, Building2, Settings, Network,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { cls, initials } from '@/lib/format';
@@ -13,6 +13,10 @@ const NAV = [
   { href: '/dashboard', label: 'Home', icon: Home },
   { href: '/companies', label: 'Companies', icon: Building2, roles: ['SUPER_ADMIN'] },
   { href: '/employees', label: 'Employees', icon: Users },
+  { label: 'Organization', icon: Network, roles: ['COMPANY_ADMIN', 'HR', 'MANAGER'], children: [
+    { href: '/departments', label: 'Departments' },
+    { href: '/designations', label: 'Designations' },
+  ] },
   { href: '/inbox', label: 'Inbox', icon: Mail },
   { label: 'Time tracker', icon: Clock, children: [
     { href: '/timesheet', label: 'Timesheet' },

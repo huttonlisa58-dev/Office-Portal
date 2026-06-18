@@ -169,12 +169,14 @@ export const employees = {
 
 // ---------- org ----------
 export const org = {
-  departments: async () => { const { data } = await supabase.from('departments').select('*').order('name'); return (data || []).map((d) => ({ _id: d.id, name: d.name })); },
-  designations: async () => { const { data } = await supabase.from('designations').select('*').order('level'); return (data || []).map((d) => ({ _id: d.id, title: d.title })); },
+  departments: async () => { const { data } = await supabase.from('departments').select('*').order('name'); return (data || []).map((d) => ({ _id: d.id, name: d.name, createdAt: d.created_at })); },
+  designations: async () => { const { data } = await supabase.from('designations').select('*').order('level', { nullsFirst: true }).order('title'); return (data || []).map((d) => ({ _id: d.id, title: d.title, level: d.level, createdAt: d.created_at })); },
   addDepartment: async (company_id, name) => { const { error } = await supabase.from('departments').insert({ company_id, name }); if (error) throw new Error(error.message); },
-  delDepartment: async (id) => { await supabase.from('departments').delete().eq('id', id); },
-  addDesignation: async (company_id, title) => { const { error } = await supabase.from('designations').insert({ company_id, title }); if (error) throw new Error(error.message); },
-  delDesignation: async (id) => { await supabase.from('designations').delete().eq('id', id); },
+  updDepartment: async (id, name) => { const { error } = await supabase.from('departments').update({ name }).eq('id', id); if (error) throw new Error(error.message); },
+  delDepartment: async (id) => { const { error } = await supabase.from('departments').delete().eq('id', id); if (error) throw new Error(error.message); },
+  addDesignation: async (company_id, title, level) => { const { error } = await supabase.from('designations').insert({ company_id, title, level: level ?? null }); if (error) throw new Error(error.message); },
+  updDesignation: async (id, title, level) => { const { error } = await supabase.from('designations').update({ title, level: level ?? null }).eq('id', id); if (error) throw new Error(error.message); },
+  delDesignation: async (id) => { const { error } = await supabase.from('designations').delete().eq('id', id); if (error) throw new Error(error.message); },
 };
 
 // ---------- attendance ----------
