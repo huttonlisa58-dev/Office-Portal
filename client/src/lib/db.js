@@ -10,7 +10,7 @@ const mEmp = (r) => r && ({
   designation: r.designation ? { title: r.designation.title } : null,
 });
 const mEmpRef = (r) => r && ({ _id: r.id, firstName: r.first_name, lastName: r.last_name, employeeId: r.employee_code });
-const mLeave = (r) => ({ _id: r.id, type: r.leave_type, from: r.from_date, to: r.to_date, days: r.days, reason: r.reason, status: r.status, employee: mEmpRef(r.employee) });
+const mLeave = (r) => ({ _id: r.id, type: r.leave_type, from: r.from_date, to: r.to_date, days: r.days, reason: r.reason, status: r.status, appliedOn: r.created_at, decisionNote: r.decision_note, employee: r.employee ? { ...mEmpRef(r.employee), location: r.employee.location || null, designation: r.employee.designation?.title || null } : null });
 const mAtt = (r) => ({ _id: r.id, date: r.work_date, status: r.status, isLate: r.is_late, workedMinutes: r.worked_minutes, overtimeMinutes: r.overtime_minutes, checkIn: r.check_in_at ? { time: r.check_in_at, method: r.check_in_method } : null, checkOut: r.check_out_at ? { time: r.check_out_at } : null, employee: mEmpRef(r.employee) });
 const mPay = (r) => ({ _id: r.id, month: r.month, year: r.year, currency: r.currency, basic: r.basic, gross: r.gross, tax: r.tax, netPay: r.net_pay, status: r.status, employee: mEmpRef(r.employee) });
 const mCompany = (r) => ({ _id: r.id, name: r.name, slug: r.slug, isActive: r.is_active, createdAt: r.created_at, subscription: { plan: r.plan } });
@@ -239,13 +239,13 @@ export const attendance = {
 // ---------- leaves ----------
 export const leaves = {
   async list() {
-    const { data } = await supabase.from('leaves').select('*, employee:employees!leaves_employee_id_fkey(first_name,last_name,employee_code)').order('created_at', { ascending: false });
+    const { data } = await supabase.from('leaves').select('*, employee:employees!leaves_employee_id_fkey(first_name,last_name,employee_code,location,designation:designations(title))').order('created_at', { ascending: false });
     return (data || []).map(mLeave);
   },
   async mine(employeeId) {
     if (!employeeId) return [];
     const { data } = await supabase.from('leaves')
-      .select('*, employee:employees!leaves_employee_id_fkey(first_name,last_name,employee_code)')
+      .select('*, employee:employees!leaves_employee_id_fkey(first_name,last_name,employee_code,location,designation:designations(title))')
       .eq('employee_id', employeeId).order('created_at', { ascending: false });
     return (data || []).map(mLeave);
   },

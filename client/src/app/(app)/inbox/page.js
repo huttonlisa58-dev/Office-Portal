@@ -35,6 +35,8 @@ const ago = (d) => {
   return `${Math.floor(diff / 30)} month(s) ago`;
 };
 
+const humanLeave = (t) => (t || '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+
 export default function InboxPage() {
   const { user } = useAuth();
   const canDecide = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR', 'MANAGER'].includes(user?.role);
@@ -135,14 +137,15 @@ export default function InboxPage() {
                 </div>
               ) : (
                 <div className="p-6">
-                  <div className="mb-4 flex items-center gap-3">
+                  <div className="mb-1 flex items-center gap-3">
                     <div className="grid h-11 w-11 place-items-center rounded-full bg-orange-500 text-sm font-semibold text-white">{initials(`${sel.employee?.firstName || ''} ${sel.employee?.lastName || ''}`)}</div>
                     <div>
-                      <div className="font-semibold">{sel.employee?.firstName} {sel.employee?.lastName}</div>
-                      <div className="text-xs text-slate-400">{sel.kind === 'attendance' ? 'Attendance regularization' : `${sel.type} leave`}</div>
+                      <div className="font-semibold text-sky-600">{sel.employee?.firstName} {sel.employee?.lastName}</div>
+                      <div className="text-xs text-slate-400">{sel.kind === 'attendance' ? 'Attendance regularization' : ([sel.employee?.designation, sel.employee?.location].filter(Boolean).join(', ') || `${humanLeave(sel.type)} leave`)}</div>
                     </div>
                   </div>
-                  <dl className="space-y-2 text-sm">
+                  <p className="mb-4 mt-2 text-sm text-slate-500">{sel.employee?.firstName} {sel.employee?.lastName} made a {sel.kind === 'attendance' ? 'regularization' : 'leave'} request</p>
+                  <dl className="space-y-2.5 text-sm">
                     {sel.kind === 'attendance' ? (<>
                       <Row k="Date" v={fmt(sel.date)} />
                       <Row k="Check-in" v={clk(sel.checkIn)} />
@@ -150,9 +153,13 @@ export default function InboxPage() {
                       <Row k="Remarks" v={sel.remarks || '—'} />
                       <Row k="Status" v={<StatusBadge status={sel.status} />} />
                     </>) : (<>
-                      <Row k="From" v={fmt(sel.from)} /><Row k="To" v={fmt(sel.to)} />
-                      <Row k="Days" v={`${sel.days} day(s)`} /><Row k="Reason" v={sel.reason || '—'} />
-                      <Row k="Status" v={<StatusBadge status={sel.status} />} />
+                      <Row k="Leave type" v={humanLeave(sel.type)} />
+                      <Row k="Applied on" v={sel.appliedOn ? `${fmt(sel.appliedOn)}, ${clk(sel.appliedOn)}` : '—'} />
+                      <Row k="No of day(s)" v={`${sel.days} day(s)`} />
+                      <Row k="Leave applied for" v={`${fmt(sel.from)}${sel.to && sel.to !== sel.from ? ` – ${fmt(sel.to)}` : ''} (${sel.days} day(s))`} />
+                      <Row k="Leave reason" v={sel.reason || '—'} />
+                      <Row k="Over all status" v={<StatusBadge status={sel.status} />} />
+                      {sel.decisionNote && <Row k="Decision note" v={sel.decisionNote} />}
                     </>)}
                   </dl>
                   {canDecide && sel.status === 'PENDING' && (
@@ -170,4 +177,4 @@ export default function InboxPage() {
     </>
   );
 }
-function Row({ k, v }) { return <div className="flex gap-3"><dt className="w-20 shrink-0 text-slate-400">{k}</dt><dd className="font-medium">{v}</dd></div>; }
+function Row({ k, v }) { return <div className="flex gap-3"><dt className="w-36 shrink-0 text-slate-400">{k}</dt><dd className="font-medium">{v}</dd></div>; }
