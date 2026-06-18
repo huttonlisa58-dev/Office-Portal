@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Building2, Users, UserCog, Cake, UserPlus, CalendarDays, Plane, UserMinus, GripVertical, Rss, LayoutGrid, Megaphone,
+  Building2, Users, UserCog, Cake, UserPlus, CalendarDays, Plane, UserMinus, GripVertical, Rss, LayoutGrid, Megaphone, UserCheck, DollarSign,
 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Legend, Tooltip } from 'recharts';
 import StatCard from '@/components/StatCard';
@@ -74,11 +74,14 @@ function Company({ name, profile }) {
   const [tab, setTab] = useState('dashboard');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState(null);
+  const isManager = ['COMPANY_ADMIN', 'HR', 'MANAGER'].includes(profile?.role);
 
   useEffect(() => {
     if (!profile) return;
     home.widgets(profile).then(setData).catch(() => {}).finally(() => setLoading(false));
-  }, [profile]);
+    if (isManager) getDashboard(profile, null).then((d) => setStats(d?.widgets || null)).catch(() => {});
+  }, [profile, isManager]);
 
   const TABS = [
     { key: 'feeds', label: 'Feeds', icon: Rss },
@@ -107,7 +110,17 @@ function Company({ name, profile }) {
 
       {tab === 'dashboard' && (
         loading ? <Loader /> : !data ? <div className="card p-8 text-center text-slate-500">Could not load dashboard.</div> : (
-          <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+          <>
+            {isManager && stats && (
+              <div className="mb-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                <StatCard icon={Users} label="Employees" value={stats.totalEmployees} tone="brand" />
+                <StatCard icon={UserCheck} label="Present today" value={stats.presentToday} tone="green" />
+                <StatCard icon={Plane} label="Pending leaves" value={stats.pendingLeaves} tone="amber" />
+                <StatCard icon={Building2} label="Departments" value={stats.departmentsCount} tone="brand" />
+                <StatCard icon={DollarSign} label="Payroll (this month)" value={stats.payrollThisMonth ? '₹' + Number(stats.payrollThisMonth).toLocaleString('en-IN') : '—'} tone="green" />
+              </div>
+            )}
+            <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
             <Widget icon={Cake} title="Birthday">
               {data.birthdays.length ? data.birthdays.map((p, i) => <Person key={p.id} i={i} id={p.id} name={p.name} sub={p.role} meta={fmtDate(p.date)} />) : <Empty text="No upcoming birthdays." />}
             </Widget>
@@ -150,6 +163,7 @@ function Company({ name, profile }) {
               {data.peopleOnLeave.length ? data.peopleOnLeave.map((p, i) => <Person key={i} i={i} name={p.name} sub={p.role} meta={`till ${fmtDate(p.until)}`} />) : <Empty text="Everyone&apos;s in today." />}
             </Widget>
           </div>
+          </>
         )
       )}
     </>

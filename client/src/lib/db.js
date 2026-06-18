@@ -89,6 +89,7 @@ export async function getDashboard(profile, company) {
   const presentCount = presentSet.size || present;
   const { data: pr } = await supabase.from('payrolls').select('net_pay').eq('company_id', cid).eq('month', now.getMonth() + 1).eq('year', now.getFullYear());
   const payrollThisMonth = (pr || []).reduce((s, x) => s + Number(x.net_pay), 0);
+  const { count: departmentsCount } = await supabase.from('departments').select('*', { count: 'exact', head: true }).eq('company_id', cid);
   // 7-day trend
   const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d.toISOString().slice(0, 10); });
   const { data: trendRows } = await supabase.from('attendance').select('work_date,check_in_at,is_late').eq('company_id', cid).in('work_date', days);
@@ -100,7 +101,7 @@ export async function getDashboard(profile, company) {
     widgets: {
       totalEmployees: totalEmployees || 0, presentToday: presentCount, lateToday: late,
       absentToday: Math.max(0, (totalEmployees || 0) - presentCount), pendingLeaves: pendingLeaves || 0,
-      payrollThisMonth, payrollRunCount: (pr || []).length,
+      payrollThisMonth, payrollRunCount: (pr || []).length, departmentsCount: departmentsCount || 0,
     },
     attendanceTrend, departmentHeadcount: [],
   };
