@@ -147,11 +147,11 @@ function Company({ name, profile }) {
                 <div className="space-y-3">
                   {[['Casual', 'CASUAL', 12], ['Sick', 'SICK', 10], ['Earned', 'EARNED', 15]].map(([label, key, quota]) => {
                     const left = data.leaveBalance[key] ?? 0;
-                    const pct = Math.round((left / quota) * 100);
+                    const pct = Math.max(0, Math.min(100, Math.round((left / quota) * 100)));
                     return (
                       <div key={key}>
                         <div className="mb-1 flex justify-between text-xs"><span className="font-medium">{label}</span><span className="text-slate-400">{left} / {quota} days</span></div>
-                        <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-2 rounded-full bg-sky-500" style={{ width: `${pct}%` }} /></div>
+                        <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800"><div className="h-2 rounded-full bg-sky-500" style={{ width: `${pct}%` }} /></div>
                       </div>
                     );
                   })}

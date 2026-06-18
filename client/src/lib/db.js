@@ -71,7 +71,7 @@ export async function getDashboard(profile, company) {
     };
   }
   const cid = profile.company_id;
-  const date = todayInTz(company?.workSettings ? company?.timezone : 'UTC');
+  const date = todayInTz(company?.timezone || 'Asia/Kolkata');
   const [{ count: totalEmployees }, { data: today }, { count: pendingLeaves }] = await Promise.all([
     supabase.from('employees').select('*', { count: 'exact', head: true }).eq('company_id', cid).eq('status', 'ACTIVE'),
     supabase.from('attendance').select('*').eq('company_id', cid).eq('work_date', date),
@@ -80,9 +80,8 @@ export async function getDashboard(profile, company) {
   const present = (today || []).filter((r) => r.check_in_at).length;
   const late = (today || []).filter((r) => r.is_late).length;
   const now = new Date();
-  // present-today now also counts the check-in/out punch system
-  const istDate = new Intl.DateTimeFormat('en-CA', { timeZone: company?.timezone || 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
-  const { data: punchRows } = await supabase.from('attendance_punches').select('employee_id').eq('company_id', cid).eq('work_date', istDate);
+  // present-today also counts the check-in/out punch system — use the same company-day as attendance
+  const { data: punchRows } = await supabase.from('attendance_punches').select('employee_id').eq('company_id', cid).eq('work_date', date);
   const presentSet = new Set();
   (today || []).forEach((r) => { if (r.check_in_at) presentSet.add(r.employee_id); });
   (punchRows || []).forEach((r) => presentSet.add(r.employee_id));
