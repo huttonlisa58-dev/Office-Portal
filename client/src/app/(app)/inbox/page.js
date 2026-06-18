@@ -159,6 +159,8 @@ export default function InboxPage() {
                       <Row k="Leave applied for" v={`${fmt(sel.from)}${sel.to && sel.to !== sel.from ? ` – ${fmt(sel.to)}` : ''} (${sel.days} day(s))`} />
                       <Row k="Leave reason" v={sel.reason || '—'} />
                       <Row k="Over all status" v={<StatusBadge status={sel.status} />} />
+                      {sel.decidedBy && <Row k="Decision taken by" v={sel.decidedBy} />}
+                      {sel.decidedAt && <Row k={`${sel.status === 'REJECTED' ? 'Rejected' : 'Approved'} date`} v={`${fmt(sel.decidedAt)}, ${clk(sel.decidedAt)}`} />}
                       {sel.decisionNote && <Row k="Decision note" v={sel.decisionNote} />}
                     </>)}
                   </dl>
