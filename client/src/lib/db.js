@@ -262,6 +262,12 @@ export const leaves = {
     if (error) throw new Error(error.message);
   },
   decide: (leave_id, decision) => invoke('leave-decision', { leave_id, decision }),
+  async approvers(leaveId) {
+    if (!leaveId) return [];
+    const { data, error } = await supabase.rpc('leave_approvers', { p_leave_id: leaveId });
+    if (error) return [];
+    return data || [];
+  },
 };
 
 // ---------- payroll ----------

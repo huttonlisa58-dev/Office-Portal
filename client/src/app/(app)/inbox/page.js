@@ -46,6 +46,12 @@ export default function InboxPage() {
   const [att, setAtt] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sel, setSel] = useState(null);
+  const [approvers, setApprovers] = useState([]);
+
+  useEffect(() => {
+    if (sel?.kind === 'leave' && sel._id) leaveApi.approvers(sel._id).then(setApprovers).catch(() => setApprovers([]));
+    else setApprovers([]);
+  }, [sel]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -159,6 +165,7 @@ export default function InboxPage() {
                       <Row k="Leave applied for" v={`${fmt(sel.from)}${sel.to && sel.to !== sel.from ? ` – ${fmt(sel.to)}` : ''} (${sel.days} day(s))`} />
                       <Row k="Leave reason" v={sel.reason || '—'} />
                       <Row k="Over all status" v={<StatusBadge status={sel.status} />} />
+                      {approvers.length > 0 && <Row k="Approver(s)" v={approvers.join(' (or) ')} />}
                       {sel.decidedBy && <Row k="Decision taken by" v={sel.decidedBy} />}
                       {sel.decidedAt && <Row k={`${sel.status === 'REJECTED' ? 'Rejected' : 'Approved'} date`} v={`${fmt(sel.decidedAt)}, ${clk(sel.decidedAt)}`} />}
                       {sel.decisionNote && <Row k="Decision note" v={sel.decisionNote} />}
