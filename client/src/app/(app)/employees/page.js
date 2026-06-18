@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Users, Plus, Search, List, Network, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
 import PageBanner from '@/components/PageBanner';
 import Loader from '@/components/Loader';
@@ -39,6 +40,7 @@ export default function EmployeesPage() {
 }
 
 function EmployeeList({ canManage, user }) {
+  const router = useRouter();
   const [data, setData] = useState({ items: [], total: 0, page: 1, pages: 1 });
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -73,7 +75,7 @@ function EmployeeList({ canManage, user }) {
               <tbody>
                 {data.items.length === 0 && <tr><td colSpan={canManage ? 9 : 8} className="px-5 py-10 text-center text-slate-400">No employees found.</td></tr>}
                 {data.items.map((e) => (
-                  <tr key={e._id} className="border-b last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <tr key={e._id} onClick={() => router.push(`/employees/${e._id}`)} className="cursor-pointer border-b last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/40">
                     <td className="px-5 py-3 text-slate-500">{e.employeeId}</td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
@@ -87,7 +89,7 @@ function EmployeeList({ canManage, user }) {
                     <td className="px-5 py-3 text-slate-500">Employee</td>
                     <td className="px-5 py-3 text-slate-500">{e.employmentType || 'Permanent'}</td>
                     <td className="px-5 py-3"><span className="badge bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">{e.status === 'ACTIVE' ? 'Active' : e.status}</span></td>
-                    {canManage && <td className="px-5 py-3"><button className="btn-ghost p-1.5" onClick={() => setEditing(e)} title="Edit employee"><Pencil size={15} /></button></td>}
+                    {canManage && <td className="px-5 py-3"><button className="btn-ghost p-1.5" onClick={(ev) => { ev.stopPropagation(); setEditing(e); }} title="Edit employee"><Pencil size={15} /></button></td>}
                   </tr>
                 ))}
               </tbody>
