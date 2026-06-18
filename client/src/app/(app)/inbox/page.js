@@ -55,12 +55,16 @@ export default function InboxPage() {
   useEffect(() => { load(); }, [load]);
 
   const mineCode = user?.employeeCode;
+  const isMine = (r) => mineCode && r.employee?.employeeId === mineCode;
   const source = module === 'leaves' ? leaves.map((l) => ({ ...l, kind: 'leave', when: l.from })) :
     module === 'attendance' ? att.map((a) => ({ ...a, kind: 'attendance', when: a.createdAt })) : [];
   const list = source.filter((r) => {
-    if (tab === 'mine') return r.employee?.employeeId === mineCode || !mineCode;
-    if (tab === 'await') return r.status === 'PENDING';
-    return r.status === 'APPROVED' || r.status === 'REJECTED';
+    // My requests: always the logged-in user's own requests.
+    if (tab === 'mine') return isMine(r);
+    const decided = r.status === 'APPROVED' || r.status === 'REJECTED';
+    // Approvers see colleagues' items in Awaiting/Completed; everyone else sees only their own.
+    if (tab === 'await') return r.status === 'PENDING' && (canDecide ? !isMine(r) : isMine(r));
+    return decided && (canDecide ? !isMine(r) : isMine(r));
   });
 
   const decide = async (item, decision) => {
