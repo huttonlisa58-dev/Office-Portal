@@ -494,6 +494,7 @@ export const punch = {
 };
 
 // ---------- shifts ----------
+const mShift = (s) => ({ _id: s.id, code: s.code, name: s.name, start: s.start_time, end: s.end_time, color: s.color, isActive: s.is_active });
 export const shifts = {
   // current employee's assigned shift + weekly off day (0=Sun..6=Sat)
   async mine(employeeId) {
@@ -505,8 +506,18 @@ export const shifts = {
   },
   async list() {
     const { data } = await supabase.from('shifts').select('*').eq('is_active', true).order('start_time');
-    return (data || []).map((s) => ({ _id: s.id, code: s.code, name: s.name, start: s.start_time, end: s.end_time, color: s.color }));
+    return (data || []).map(mShift);
   },
+  async listAll() {
+    const { data } = await supabase.from('shifts').select('*').order('start_time');
+    return (data || []).map(mShift);
+  },
+  add: async ({ company_id, name, code, start, end, color }) => {
+    const { error } = await supabase.from('shifts').insert({ company_id, name, code: code || null, start_time: start, end_time: end, color: color || null, is_active: true });
+    if (error) throw new Error(error.message);
+  },
+  update: async (id, fields) => { const { error } = await supabase.from('shifts').update(fields).eq('id', id); if (error) throw new Error(error.message); },
+  del: async (id) => { const { error } = await supabase.from('shifts').delete().eq('id', id); if (error) throw new Error(error.message); },
 };
 
 // ---------- attendance regularization requests ----------
