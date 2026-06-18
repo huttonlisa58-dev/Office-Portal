@@ -226,13 +226,17 @@ export const attendance = {
     return { start, end, rows: (att.data || []).map(mAtt), holidays: (hol.data || []).map((h) => h.date) };
   },
   async today(companyId) {
-    const date = todayInTz('UTC');
-    const { data } = await supabase.from('attendance').select('*, employee:employees(first_name,last_name,employee_code)').eq('work_date', date);
+    const date = todayInTz('Asia/Kolkata');
+    let q = supabase.from('attendance').select('*, employee:employees(first_name,last_name,employee_code)').eq('work_date', date);
+    if (companyId) q = q.eq('company_id', companyId);
+    const { data } = await q;
     const records = (data || []).map(mAtt);
     const present = records.filter((r) => r.checkIn).length;
     const late = records.filter((r) => r.isLate).length;
-    const { count } = await supabase.from('employees').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE');
-    return { date, present, late, absent: (count || 0) - present, totalEmployees: count || 0, records };
+    let ce = supabase.from('employees').select('*', { count: 'exact', head: true }).eq('status', 'ACTIVE');
+    if (companyId) ce = ce.eq('company_id', companyId);
+    const { count } = await ce;
+    return { date, present, late, absent: Math.max(0, (count || 0) - present), totalEmployees: count || 0, records };
   },
   async list({ from } = {}) {
     let q = supabase.from('attendance').select('*, employee:employees(first_name,last_name,employee_code)').order('work_date', { ascending: false }).limit(200);
