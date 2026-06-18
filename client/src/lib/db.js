@@ -126,6 +126,12 @@ export const employees = {
     if (error) throw new Error(error.message);
     return data;
   },
+  async basicProfile(id) {
+    if (!id) return null;
+    const { data, error } = await supabase.rpc('employee_basic_profile', { p_id: id });
+    if (error) throw new Error(error.message);
+    return data;
+  },
   async getOne(id) {
     if (!id) return null;
     const { data } = await supabase.from('employees')
