@@ -177,6 +177,10 @@ export const org = {
   addDesignation: async (company_id, title, level) => { const { error } = await supabase.from('designations').insert({ company_id, title, level: level ?? null }); if (error) throw new Error(error.message); },
   updDesignation: async (id, title, level) => { const { error } = await supabase.from('designations').update({ title, level: level ?? null }).eq('id', id); if (error) throw new Error(error.message); },
   delDesignation: async (id) => { const { error } = await supabase.from('designations').delete().eq('id', id); if (error) throw new Error(error.message); },
+  officeLocations: async () => { const { data } = await supabase.from('office_locations').select('*').order('name'); return (data || []).map((o) => ({ _id: o.id, name: o.name, address: o.address, isActive: o.is_active })); },
+  addOfficeLocation: async (company_id, name, address) => { const { error } = await supabase.from('office_locations').insert({ company_id, name, address: address || null, is_active: true }); if (error) throw new Error(error.message); },
+  updOfficeLocation: async (id, name, address) => { const { error } = await supabase.from('office_locations').update({ name, address: address || null }).eq('id', id); if (error) throw new Error(error.message); },
+  delOfficeLocation: async (id) => { const { error } = await supabase.from('office_locations').delete().eq('id', id); if (error) throw new Error(error.message); },
 };
 
 // ---------- attendance ----------

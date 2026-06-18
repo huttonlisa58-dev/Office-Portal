@@ -16,6 +16,7 @@ const NAV = [
   { label: 'Organization', icon: Network, roles: ['COMPANY_ADMIN', 'HR', 'MANAGER'], children: [
     { href: '/departments', label: 'Departments' },
     { href: '/designations', label: 'Designations' },
+    { href: '/locations', label: 'Office locations' },
   ] },
   { href: '/inbox', label: 'Inbox', icon: Mail },
   { label: 'Time tracker', icon: Clock, children: [

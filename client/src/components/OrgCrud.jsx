@@ -5,14 +5,15 @@ import PageBanner from '@/components/PageBanner';
 import Loader from '@/components/Loader';
 import { useAuth } from '@/context/AuthContext';
 
-export default function OrgCrud({ icon, title, singular, valueLabel, hasLevel, api }) {
+// secondary (optional): { field, label, colLabel, type: 'text'|'number', placeholder }
+export default function OrgCrud({ icon, title, singular, valueLabel, secondary, api }) {
   const { user } = useAuth();
   const canManage = ['COMPANY_ADMIN', 'HR', 'MANAGER'].includes(user?.role);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // { mode: 'add' | 'edit', item }
   const [val, setVal] = useState('');
-  const [lvl, setLvl] = useState('');
+  const [sec, setSec] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
@@ -22,22 +23,22 @@ export default function OrgCrud({ icon, title, singular, valueLabel, hasLevel, a
   }, [api]);
   useEffect(() => { load(); }, [load]);
 
-  const openAdd = () => { setVal(''); setLvl(''); setErr(''); setModal({ mode: 'add' }); };
-  const openEdit = (it) => { setVal(it[api.field] || ''); setLvl(it.level ?? ''); setErr(''); setModal({ mode: 'edit', item: it }); };
+  const openAdd = () => { setVal(''); setSec(''); setErr(''); setModal({ mode: 'add' }); };
+  const openEdit = (it) => { setVal(it[api.field] || ''); setSec(secondary ? (it[secondary.field] ?? '') : ''); setErr(''); setModal({ mode: 'edit', item: it }); };
 
   const save = async () => {
     if (!val.trim()) { setErr(`${valueLabel} is required`); return; }
     setBusy(true); setErr('');
     try {
-      const level = hasLevel ? (lvl === '' ? null : Number(lvl)) : undefined;
-      if (modal.mode === 'add') await api.add(user.company, val.trim(), level);
-      else await api.update(modal.item._id, val.trim(), level);
+      const secVal = secondary ? (secondary.type === 'number' ? (sec === '' ? null : Number(sec)) : (String(sec).trim() || null)) : undefined;
+      if (modal.mode === 'add') await api.add(user.company, val.trim(), secVal);
+      else await api.update(modal.item._id, val.trim(), secVal);
       setModal(null); load();
     } catch (e) { setErr(e.message || 'Failed'); } finally { setBusy(false); }
   };
 
   const del = async (it) => {
-    if (!window.confirm(`Delete ${singular} "${it[api.field]}"? Employees assigned to it will keep their record but lose this link.`)) return;
+    if (!window.confirm(`Delete ${singular} "${it[api.field]}"?`)) return;
     try { await api.del(it._id); load(); } catch (e) { window.alert(e.message || 'Delete failed'); }
   };
 
@@ -62,7 +63,7 @@ export default function OrgCrud({ icon, title, singular, valueLabel, hasLevel, a
               <thead>
                 <tr className="border-b text-left text-slate-400 dark:border-slate-700">
                   <th className="px-5 py-3 font-medium">{valueLabel}</th>
-                  {hasLevel && <th className="px-5 py-3 font-medium">Level</th>}
+                  {secondary && <th className="px-5 py-3 font-medium">{secondary.colLabel || secondary.label}</th>}
                   {canManage && <th className="px-5 py-3 text-right font-medium">Actions</th>}
                 </tr>
               </thead>
@@ -70,7 +71,7 @@ export default function OrgCrud({ icon, title, singular, valueLabel, hasLevel, a
                 {items.map((it) => (
                   <tr key={it._id} className="border-b last:border-0 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/40">
                     <td className="px-5 py-3 font-medium">{it[api.field]}</td>
-                    {hasLevel && <td className="px-5 py-3 text-slate-500">{it.level ?? '—'}</td>}
+                    {secondary && <td className="px-5 py-3 text-slate-500">{it[secondary.field] || '—'}</td>}
                     {canManage && (
                       <td className="px-5 py-3">
                         <div className="flex justify-end gap-1">
@@ -95,13 +96,13 @@ export default function OrgCrud({ icon, title, singular, valueLabel, hasLevel, a
               <button onClick={() => !busy && setModal(null)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"><X size={18} /></button>
             </div>
             <label className="mb-1 block text-sm font-medium text-slate-600 dark:text-slate-300">{valueLabel}</label>
-            <input autoFocus value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()}
+            <input autoFocus value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && !secondary && save()}
               className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-sky-500 dark:border-slate-600 dark:bg-slate-900" placeholder={valueLabel} />
-            {hasLevel && (
+            {secondary && (
               <>
-                <label className="mb-1 mt-4 block text-sm font-medium text-slate-600 dark:text-slate-300">Level (optional)</label>
-                <input type="number" value={lvl} onChange={(e) => setLvl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()}
-                  className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-sky-500 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. 1 (seniority)" />
+                <label className="mb-1 mt-4 block text-sm font-medium text-slate-600 dark:text-slate-300">{secondary.label}</label>
+                <input type={secondary.type === 'number' ? 'number' : 'text'} value={sec} onChange={(e) => setSec(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()}
+                  className="w-full rounded-lg border px-3 py-2 text-sm outline-none focus:border-sky-500 dark:border-slate-600 dark:bg-slate-900" placeholder={secondary.placeholder || ''} />
               </>
             )}
             {err && <p className="mt-3 text-sm text-rose-600">{err}</p>}

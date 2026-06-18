@@ -10,7 +10,7 @@ export default function DesignationsPage() {
       title="Designations"
       singular="designation"
       valueLabel="Designation title"
-      hasLevel
+      secondary={{ field: 'level', label: 'Level (optional)', colLabel: 'Level', type: 'number', placeholder: 'e.g. 1 (seniority)' }}
       api={{ field: 'title', list: org.designations, add: org.addDesignation, update: org.updDesignation, del: org.delDesignation }}
     />
   );
