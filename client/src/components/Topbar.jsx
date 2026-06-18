@@ -58,7 +58,7 @@ function CheckInOut() {
     return (
       <button onClick={doPunch} disabled={busy}
         className="flex items-center gap-2 rounded-full border-2 border-sky-500 bg-sky-50 px-3 py-1.5 text-sm font-bold tracking-wide sm:px-4 text-sky-700 transition hover:bg-sky-100 disabled:opacity-60 dark:bg-sky-950/40 dark:text-sky-300" title="Tap to check out">
-        <span className="tabular-nums">{fmtHMS(day.workMs / 1000)}</span>
+        <span className="tabular-nums">{fmtHMS(day.openInAt ? (now - new Date(day.openInAt).getTime()) / 1000 : 0)}</span>
         <span className="text-xs">{busy ? '…' : 'CHECK OUT'}</span>
       </button>
     );
