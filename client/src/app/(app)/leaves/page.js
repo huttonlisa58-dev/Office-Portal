@@ -45,8 +45,11 @@ function LegendRow({ color, label, value }) {
 export default function LeavesPage() {
   const { user, company } = useAuth();
   const hasEmployee = Boolean(user?.employee);
+  const canManage = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR', 'MANAGER'].includes(user?.role);
   const [items, setItems] = useState([]);
   const [balances, setBalances] = useState({});
+  const [txns, setTxns] = useState([]);
+  const [accruing, setAccruing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ type: 'CASUAL', from: '', to: '', reason: '' });
@@ -56,14 +59,24 @@ export default function LeavesPage() {
     setLoading(true);
     try {
       const calls = [leaveApi.list()];
-      if (hasEmployee) calls.push(leaveApi.balance(user?.employee));
-      const [list, bal] = await Promise.all(calls);
+      if (hasEmployee) { calls.push(leaveApi.balance(user?.employee)); calls.push(leaveApi.transactions(user?.employee)); }
+      const [list, bal, tx] = await Promise.all(calls);
       setItems(list);
       if (bal?.balances) setBalances(bal.balances);
+      setTxns(tx || []);
     } catch { /* ignore */ } finally { setLoading(false); }
   }, [hasEmployee, user]);
 
   useEffect(() => { load(); }, [load]);
+
+  const runAccrual = async () => {
+    setAccruing(true);
+    try {
+      const res = await leaveApi.runAccrual();
+      window.alert(`Accrual complete — ${res?.credits_applied ?? 0} credit(s) applied across ${res?.employees_processed ?? 0} employee(s).`);
+      load();
+    } catch (e) { window.alert(e.message || 'Accrual failed'); } finally { setAccruing(false); }
+  };
 
   const mine = hasEmployee ? items.filter((l) => l.employee && l.employee.employeeId === user?.employeeCode) : items;
 
@@ -82,6 +95,7 @@ export default function LeavesPage() {
     <>
       <PageBanner icon={Plane} title="My Leaves">
         <span className="hidden text-sm text-sky-100 sm:inline">1 Jan {year} – 31 Dec {year}</span>
+        {canManage && <button className="rounded-xl bg-sky-700/40 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-700/60 disabled:opacity-60" onClick={runAccrual} disabled={accruing}>{accruing ? 'Running…' : 'Run accrual'}</button>}
         {hasEmployee && <button className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-sky-600 hover:bg-sky-50" onClick={() => setOpen(true)}><Plus size={15} className="mr-1 inline" />APPLY LEAVE</button>}
       </PageBanner>
 
@@ -132,6 +146,29 @@ export default function LeavesPage() {
               </table>
             </div>
           </div>
+
+          {hasEmployee && txns.length > 0 && (
+            <div className="card mt-6 overflow-hidden">
+              <div className="border-b px-5 py-3 font-semibold dark:border-slate-700">Leave credit history</div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="border-b text-left text-slate-400 dark:border-slate-700">
+                    {['Date', 'Leave type', 'Amount', 'Source'].map((h) => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}
+                  </tr></thead>
+                  <tbody>
+                    {txns.map((t) => (
+                      <tr key={t._id} className="border-b last:border-0 dark:border-slate-700">
+                        <td className="px-5 py-3 text-slate-500">{fmt(t.date)}</td>
+                        <td className="px-5 py-3">{t.type[0] + t.type.slice(1).toLowerCase()} Leave</td>
+                        <td className={`px-5 py-3 font-medium ${t.amount >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{t.amount >= 0 ? '+' : ''}{t.amount} day(s)</td>
+                        <td className="px-5 py-3 text-slate-400">{t.kind === 'ACCRUAL' ? 'Auto accrual' : t.note || t.kind}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
 

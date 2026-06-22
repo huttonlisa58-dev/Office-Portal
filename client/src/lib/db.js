@@ -279,6 +279,16 @@ export const leaves = {
     if (error) return [];
     return data || [];
   },
+  async runAccrual(asOf) {
+    const { data, error } = await supabase.rpc('run_company_leave_accrual', asOf ? { p_as_of: asOf } : {});
+    if (error) throw new Error(error.message);
+    return data;
+  },
+  async transactions(employeeId) {
+    if (!employeeId) return [];
+    const { data } = await supabase.from('leave_transactions').select('*').eq('employee_id', employeeId).order('created_at', { ascending: false }).limit(50);
+    return (data || []).map((t) => ({ _id: t.id, date: t.created_at, type: t.leave_type, amount: Number(t.amount), kind: t.kind, note: t.note }));
+  },
 };
 
 // ---------- payroll ----------
