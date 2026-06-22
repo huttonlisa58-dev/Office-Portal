@@ -2,9 +2,10 @@
 import { useEffect, useState } from 'react';
 import Modal from '@/components/Modal';
 import Loader from '@/components/Loader';
-import { employees as empApi, org } from '@/lib/db';
+import { employees as empApi, org, shifts as shiftApi } from '@/lib/db';
 
 const GENDERS = ['Male', 'Female', 'Other'];
+const WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const BLOODS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
 const MARITALS = ['Single', 'Married', 'Divorced', 'Widowed'];
 const EMP_TYPES = ['FULL_TIME', 'PART_TIME', 'CONTRACT', 'INTERN', 'PERMANENT'];
@@ -16,14 +17,14 @@ const Fld = ({ label, req, children }) => <div><label className="label">{label}{
 export default function EditEmployeeModal({ emp, onClose, onDone }) {
   const open = !!emp;
   const [form, setForm] = useState({});
-  const [depts, setDepts] = useState([]); const [desigs, setDesigs] = useState([]); const [mgrs, setMgrs] = useState([]);
+  const [depts, setDepts] = useState([]); const [desigs, setDesigs] = useState([]); const [mgrs, setMgrs] = useState([]); const [shiftOpts, setShiftOpts] = useState([]);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(false);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   useEffect(() => {
     if (!emp) return;
     setErr(''); setLoading(true);
-    org.departments().then(setDepts); org.designations().then(setDesigs); empApi.all().then(setMgrs).catch(() => {});
+    org.departments().then(setDepts); org.designations().then(setDesigs); empApi.all().then(setMgrs).catch(() => {}); shiftApi.list().then(setShiftOpts).catch(() => {});
     empApi.getOne(emp._id).then((d) => {
       const e = d || emp;
       setForm({
@@ -33,6 +34,7 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
         maritalStatus: e.maritalStatus || '', smoker: e.smoker ? 'Yes' : 'No', address: e.address || '',
         employmentType: e.employmentType || 'FULL_TIME', status: e.status || 'ACTIVE',
         dateOfJoining: e.dateOfJoining || '', deptId: e.departmentId || '', desigId: e.designationId || '', managerId: '',
+        shiftId: e.shiftId || '', weeklyOff: e.weeklyOff ?? '',
       });
     }).catch(() => {}).finally(() => setLoading(false));
   }, [emp]);
@@ -47,6 +49,7 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
         address: form.address || null, date_of_joining: form.dateOfJoining || null,
         employment_type: form.employmentType, status: form.status,
         department_id: form.deptId || null, designation_id: form.desigId || null,
+        shift_id: form.shiftId || null, weekly_off: form.weeklyOff === '' ? null : Number(form.weeklyOff),
         ...(form.managerId ? { manager_id: form.managerId } : {}),
       });
 
@@ -104,6 +107,8 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
           <Fld label="Date of joining"><input className="input" type="date" value={form.dateOfJoining || ''} onChange={set('dateOfJoining')} /></Fld>
           <Fld label="Employment type"><select className="input" value={form.employmentType || 'FULL_TIME'} onChange={set('employmentType')}>{EMP_TYPES.map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}</select></Fld>
           <Fld label="Employee status"><select className="input" value={form.status || 'ACTIVE'} onChange={set('status')}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></Fld>
+          <Fld label="Shift"><select className="input" value={form.shiftId || ''} onChange={set('shiftId')}><option value="">— none —</option>{shiftOpts.map((s) => <option key={s._id} value={s._id}>{s.name}{s.start ? ` (${String(s.start).slice(0, 5)}–${String(s.end).slice(0, 5)})` : ''}</option>)}</select></Fld>
+          <Fld label="Weekly off"><select className="input" value={form.weeklyOff === '' ? '' : String(form.weeklyOff)} onChange={set('weeklyOff')}><option value="">— none —</option>{WEEK.map((w, i) => <option key={w} value={i}>{w}</option>)}</select></Fld>
         </div>
 
         <div className="flex justify-end gap-2 border-t pt-3 dark:border-slate-700">

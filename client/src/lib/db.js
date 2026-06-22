@@ -145,6 +145,7 @@ export const employees = {
       middleName: data.middle_name || null, nickName: data.nick_name || null,
       bloodGroup: data.blood_group || null, maritalStatus: data.marital_status || null,
       smoker: data.smoker || false,
+      shiftId: data.shift_id || null, weeklyOff: data.weekly_off ?? null,
       manager: data.manager ? { name: `${data.manager.first_name} ${data.manager.last_name || ''}`.trim(), code: data.manager.employee_code } : null,
     };
   },
