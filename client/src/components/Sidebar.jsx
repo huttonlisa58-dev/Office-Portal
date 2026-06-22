@@ -17,6 +17,7 @@ const NAV = [
     { href: '/departments', label: 'Departments' },
     { href: '/designations', label: 'Designations' },
     { href: '/locations', label: 'Office locations' },
+    { href: '/shifts/requests', label: 'Shift requests' },
   ] },
   { href: '/inbox', label: 'Inbox', icon: Mail },
   { label: 'Time tracker', icon: Clock, children: [

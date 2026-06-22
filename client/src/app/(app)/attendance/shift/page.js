@@ -1,10 +1,12 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Repeat } from 'lucide-react';
 import PageBanner from '@/components/PageBanner';
 import Loader from '@/components/Loader';
+import Modal from '@/components/Modal';
+import { StatusBadge } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
-import { shifts as shiftApi, holidays as holidayApi } from '@/lib/db';
+import { shifts as shiftApi, holidays as holidayApi, shiftRequests } from '@/lib/db';
 
 const WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -18,15 +20,30 @@ export default function MyShiftPage() {
   const [data, setData] = useState({ shift: null, weeklyOff: 0 });
   const [holidayMap, setHolidayMap] = useState({});
   const [loading, setLoading] = useState(true);
+  const [allShifts, setAllShifts] = useState([]);
+  const [myReqs, setMyReqs] = useState([]);
+  const [req, setReq] = useState({ open: false, shiftId: '', reason: '', busy: false, err: '' });
+
+  const loadReqs = () => { if (employeeId) shiftRequests.mine(employeeId).then(setMyReqs).catch(() => {}); };
 
   useEffect(() => {
     let alive = true;
     setLoading(true);
-    Promise.all([shiftApi.mine(employeeId), holidayApi.all()])
-      .then(([r, hs]) => { if (!alive) return; setData(r); const m = {}; (hs || []).forEach((h) => { m[h.date] = h.name; }); setHolidayMap(m); })
+    Promise.all([shiftApi.mine(employeeId), holidayApi.all(), shiftApi.list().catch(() => []), shiftRequests.mine(employeeId).catch(() => [])])
+      .then(([r, hs, sh, mr]) => { if (!alive) return; setData(r); const m = {}; (hs || []).forEach((h) => { m[h.date] = h.name; }); setHolidayMap(m); setAllShifts(sh || []); setMyReqs(mr || []); })
       .catch(() => {}).finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [employeeId]);
+
+  const submitReq = async () => {
+    if (!req.shiftId || !employeeId) { setReq((r) => ({ ...r, err: 'Pick a shift' })); return; }
+    setReq((r) => ({ ...r, busy: true, err: '' }));
+    try {
+      await shiftRequests.create({ company_id: user?.company, employee_id: employeeId, current_shift_id: data.shift?.id || null, requested_shift_id: req.shiftId, reason: req.reason });
+      setReq({ open: false, shiftId: '', reason: '', busy: false, err: '' });
+      loadReqs();
+    } catch (e) { setReq((r) => ({ ...r, busy: false, err: e.message || 'Failed' })); }
+  };
 
   const cells = useMemo(() => {
     const first = new Date(cursor.y, cursor.m, 1);
@@ -52,6 +69,7 @@ export default function MyShiftPage() {
           <button onClick={() => move(-1)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/20 hover:bg-white/30" aria-label="Previous month"><ChevronLeft size={18} /></button>
           <button onClick={goToday} className="min-w-[120px] rounded-lg bg-white px-3 py-1.5 text-center text-sm font-semibold text-sky-700 hover:bg-sky-50">{MONTHS[cursor.m]} {cursor.y}</button>
           <button onClick={() => move(1)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/20 hover:bg-white/30" aria-label="Next month"><ChevronRight size={18} /></button>
+          {employeeId && <button onClick={() => setReq((r) => ({ ...r, open: true, err: '' }))} className="ml-2 inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-sky-700 hover:bg-sky-50"><Repeat size={14} /> Request change</button>}
         </div>
       </PageBanner>
 
@@ -106,6 +124,45 @@ export default function MyShiftPage() {
           </div>
         </div>
       )}
+
+      {myReqs.length > 0 && (
+        <div className="card mt-4 p-5">
+          <div className="mb-3 font-semibold">My shift change requests</div>
+          <div className="space-y-2">
+            {myReqs.map((r) => (
+              <div key={r._id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm dark:bg-slate-800/60">
+                <span>{r.currentShift || '—'} <span className="text-slate-400">→</span> <span className="font-medium">{r.requestedShift || '—'}</span>{r.reason ? <span className="text-slate-400"> · {r.reason}</span> : ''}</span>
+                <div className="flex items-center gap-3">
+                  {r.decisionNote && <span className="text-xs text-slate-400">{r.decisionNote}</span>}
+                  <StatusBadge status={r.status} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <Modal open={req.open} onClose={() => setReq((r) => ({ ...r, open: false }))} title="Request shift change" width="max-w-md">
+        <div className="space-y-3">
+          {req.err && <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{req.err}</div>}
+          <div className="text-sm text-slate-500">Current shift: <span className="font-medium text-slate-700 dark:text-slate-200">{data.shift?.name || 'None'}</span></div>
+          <div>
+            <label className="label">Requested shift</label>
+            <select className="input" value={req.shiftId} onChange={(e) => setReq((r) => ({ ...r, shiftId: e.target.value, err: '' }))}>
+              <option value="">— select —</option>
+              {allShifts.filter((s) => s._id !== data.shift?.id).map((s) => <option key={s._id} value={s._id}>{s.name}{s.start ? ` (${String(s.start).slice(0, 5)}–${String(s.end).slice(0, 5)})` : ''}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Reason</label>
+            <textarea className="input" rows={2} value={req.reason} onChange={(e) => setReq((r) => ({ ...r, reason: e.target.value }))} placeholder="Why do you need this change?" />
+          </div>
+          <div className="flex justify-end gap-2 border-t pt-3 dark:border-slate-700">
+            <button className="btn-outline" onClick={() => setReq((r) => ({ ...r, open: false }))}>Cancel</button>
+            <button className="btn-primary disabled:opacity-60" disabled={req.busy || !req.shiftId} onClick={submitReq}>{req.busy ? 'Sending…' : 'Send request'}</button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

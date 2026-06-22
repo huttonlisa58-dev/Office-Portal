@@ -534,6 +534,38 @@ export const shifts = {
   },
 };
 
+const mSCR = (r) => ({
+  _id: r.id, status: r.status, reason: r.reason, decisionNote: r.decision_note,
+  createdAt: r.created_at, decidedAt: r.decided_at,
+  employee: r.employee ? { name: `${r.employee.first_name} ${r.employee.last_name || ''}`.trim(), code: r.employee.employee_code } : null,
+  currentShift: r.current?.name || null,
+  requestedShift: r.requested?.name || null,
+});
+
+export const shiftRequests = {
+  create: async ({ company_id, employee_id, current_shift_id, requested_shift_id, reason }) => {
+    const { error } = await supabase.from('shift_change_requests').insert({ company_id, employee_id, current_shift_id: current_shift_id || null, requested_shift_id, reason: reason || null });
+    if (error) throw new Error(error.message);
+  },
+  mine: async (employeeId) => {
+    if (!employeeId) return [];
+    const { data } = await supabase.from('shift_change_requests')
+      .select('*, current:shifts!shift_change_requests_current_shift_id_fkey(name), requested:shifts!shift_change_requests_requested_shift_id_fkey(name)')
+      .eq('employee_id', employeeId).order('created_at', { ascending: false });
+    return (data || []).map(mSCR);
+  },
+  list: async () => {
+    const { data } = await supabase.from('shift_change_requests')
+      .select('*, employee:employees!shift_change_requests_employee_id_fkey(first_name,last_name,employee_code), current:shifts!shift_change_requests_current_shift_id_fkey(name), requested:shifts!shift_change_requests_requested_shift_id_fkey(name)')
+      .order('created_at', { ascending: false });
+    return (data || []).map(mSCR);
+  },
+  decide: async (id, decision, note) => {
+    const { error } = await supabase.rpc('decide_shift_change', { p_id: id, p_decision: decision, p_note: note || null });
+    if (error) throw new Error(error.message);
+  },
+};
+
 // ---------- attendance regularization requests ----------
 const mAttReq = (r) => ({
   _id: r.id, date: r.work_date, checkIn: r.check_in, checkOut: r.check_out,
