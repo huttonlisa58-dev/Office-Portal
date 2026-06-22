@@ -526,6 +526,12 @@ export const shifts = {
   },
   update: async (id, fields) => { const { error } = await supabase.from('shifts').update(fields).eq('id', id); if (error) throw new Error(error.message); },
   del: async (id) => { const { error } = await supabase.from('shifts').delete().eq('id', id); if (error) throw new Error(error.message); },
+  assignToEmployees: async (ids, patch) => {
+    if (!ids?.length) return 0;
+    const { error } = await supabase.from('employees').update(patch).in('id', ids);
+    if (error) throw new Error(error.message);
+    return ids.length;
+  },
 };
 
 // ---------- attendance regularization requests ----------

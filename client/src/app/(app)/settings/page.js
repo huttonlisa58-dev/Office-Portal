@@ -1,11 +1,13 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Building2, Layers, Briefcase, Clock, Trash2, Plus } from 'lucide-react';
+import { Building2, Layers, Briefcase, Clock, Trash2, Plus, Users } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import Loader from '@/components/Loader';
 import { useAuth } from '@/context/AuthContext';
-import { org, shifts as shiftApi } from '@/lib/db';
+import { org, shifts as shiftApi, employees as empApi } from '@/lib/db';
 import { supabase } from '@/lib/supabaseClient';
+
+const WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export default function SettingsPage() {
   const { user, company, refresh } = useAuth();
@@ -14,6 +16,8 @@ export default function SettingsPage() {
   const [desigs, setDesigs] = useState([]);
   const [shiftList, setShiftList] = useState([]);
   const [newShift, setNewShift] = useState({ name: '', start: '09:00', end: '18:00' });
+  const [empList, setEmpList] = useState([]);
+  const [bulk, setBulk] = useState({ shiftId: '', weeklyOff: '', filter: '', picked: [], busy: false, msg: '' });
   const [loading, setLoading] = useState(true);
   const [newDept, setNewDept] = useState('');
   const [newDesig, setNewDesig] = useState('');
@@ -22,8 +26,10 @@ export default function SettingsPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const [d, g, sh] = await Promise.all([org.departments(), org.designations(), shiftApi.listAll()]); setDepts(d); setDesigs(g); setShiftList(sh); }
-    catch { /* ignore */ } finally { setLoading(false); }
+    try {
+      const [d, g, sh, em] = await Promise.all([org.departments(), org.designations(), shiftApi.listAll(), empApi.all().catch(() => [])]);
+      setDepts(d); setDesigs(g); setShiftList(sh); setEmpList(em || []);
+    } catch { /* ignore */ } finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (company?.workSettings) setWork((w) => ({ ...w, ...company.workSettings })); }, [company]);
@@ -38,6 +44,22 @@ export default function SettingsPage() {
     catch (e) { window.alert(e.message || 'Could not add shift'); }
   };
   const delShift = async (id) => { try { await shiftApi.del(id); load(); } catch (e) { window.alert(e.message || 'Could not delete'); } };
+
+  const togglePick = (id) => setBulk((b) => ({ ...b, picked: b.picked.includes(id) ? b.picked.filter((x) => x !== id) : [...b.picked, id], msg: '' }));
+  const filteredEmps = empList.filter((e) => `${e.firstName} ${e.lastName} ${e.employeeId}`.toLowerCase().includes(bulk.filter.toLowerCase()));
+  const allPicked = filteredEmps.length > 0 && filteredEmps.every((e) => bulk.picked.includes(e._id));
+  const toggleAll = () => setBulk((b) => ({ ...b, picked: allPicked ? b.picked.filter((id) => !filteredEmps.some((e) => e._id === id)) : [...new Set([...b.picked, ...filteredEmps.map((e) => e._id)])], msg: '' }));
+  const applyBulk = async () => {
+    if (!bulk.picked.length || (!bulk.shiftId && bulk.weeklyOff === '')) return;
+    setBulk((b) => ({ ...b, busy: true, msg: '' }));
+    try {
+      const patch = {};
+      if (bulk.shiftId) patch.shift_id = bulk.shiftId;
+      if (bulk.weeklyOff !== '') patch.weekly_off = Number(bulk.weeklyOff);
+      const n = await shiftApi.assignToEmployees(bulk.picked, patch);
+      setBulk((b) => ({ ...b, busy: false, picked: [], msg: `Assigned to ${n} employee(s).` }));
+    } catch (e) { setBulk((b) => ({ ...b, busy: false, msg: e.message || 'Failed' })); }
+  };
 
   const saveWork = async () => {
     if (!companyId) return;
@@ -97,6 +119,44 @@ export default function SettingsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        <div className="card p-5 lg:col-span-2">
+          <div className="mb-4 flex items-center gap-2"><Users size={18} className="text-brand-600" /><span className="font-semibold">Bulk shift assignment</span></div>
+          <div className="mb-3 flex flex-wrap items-end gap-3">
+            <div className="min-w-[180px] flex-1">
+              <label className="label">Shift</label>
+              <select className="input" value={bulk.shiftId} onChange={(e) => setBulk((b) => ({ ...b, shiftId: e.target.value, msg: '' }))}>
+                <option value="">— no change —</option>
+                {shiftList.map((s) => <option key={s._id} value={s._id}>{s.name}{s.start ? ` (${String(s.start).slice(0, 5)}–${String(s.end).slice(0, 5)})` : ''}</option>)}
+              </select>
+            </div>
+            <div className="w-44">
+              <label className="label">Weekly off</label>
+              <select className="input" value={bulk.weeklyOff} onChange={(e) => setBulk((b) => ({ ...b, weeklyOff: e.target.value, msg: '' }))}>
+                <option value="">— no change —</option>
+                {WEEK.map((w, i) => <option key={w} value={i}>{w}</option>)}
+              </select>
+            </div>
+          </div>
+          <input className="input mb-2" placeholder="Search employees…" value={bulk.filter} onChange={(e) => setBulk((b) => ({ ...b, filter: e.target.value }))} />
+          <div className="mb-2 flex items-center justify-between text-sm">
+            <label className="flex cursor-pointer items-center gap-2"><input type="checkbox" checked={allPicked} onChange={toggleAll} /> Select all ({filteredEmps.length})</label>
+            <span className="text-slate-400">{bulk.picked.length} selected</span>
+          </div>
+          <div className="max-h-64 overflow-y-auto rounded-xl border dark:border-slate-700">
+            {filteredEmps.length === 0 ? <p className="p-4 text-sm text-slate-400">No employees.</p> : filteredEmps.map((e) => (
+              <label key={e._id} className="flex cursor-pointer items-center gap-3 border-b px-3 py-2 text-sm last:border-0 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800/40">
+                <input type="checkbox" checked={bulk.picked.includes(e._id)} onChange={() => togglePick(e._id)} />
+                <span className="font-medium">{e.firstName} {e.lastName}</span>
+                <span className="text-slate-400">{e.employeeId}</span>
+              </label>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <button className="btn-primary disabled:opacity-60" disabled={bulk.busy || !bulk.picked.length || (!bulk.shiftId && bulk.weeklyOff === '')} onClick={applyBulk}>{bulk.busy ? 'Assigning…' : `Assign to ${bulk.picked.length} selected`}</button>
+            {bulk.msg && <span className="text-sm text-emerald-600">{bulk.msg}</span>}
           </div>
         </div>
 
