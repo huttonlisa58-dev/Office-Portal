@@ -6,7 +6,7 @@ import Loader from '@/components/Loader';
 import Modal from '@/components/Modal';
 import { StatusBadge } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
-import { leaves as leaveApi } from '@/lib/db';
+import { leaves as leaveApi, leavePolicies } from '@/lib/db';
 
 const TYPES = ['CASUAL', 'SICK', 'EARNED', 'UNPAID'];
 const fmt = (d) => d ? new Date(d).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -49,6 +49,7 @@ export default function LeavesPage() {
   const [items, setItems] = useState([]);
   const [balances, setBalances] = useState({});
   const [txns, setTxns] = useState([]);
+  const [quotas, setQuotas] = useState({});
   const [accruing, setAccruing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -64,6 +65,9 @@ export default function LeavesPage() {
       setItems(list);
       if (bal?.balances) setBalances(bal.balances);
       setTxns(tx || []);
+      const lps = await leavePolicies.list().catch(() => []);
+      const qm = {}; (lps || []).forEach((p) => { qm[p.leaveType] = p.annualQuota; });
+      setQuotas(qm);
     } catch { /* ignore */ } finally { setLoading(false); }
   }, [hasEmployee, user]);
 
@@ -103,15 +107,16 @@ export default function LeavesPage() {
         <>
           <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {CARDS.map((cd) => {
+              const quota = quotas[cd.key] ?? cd.quota;
               const available = cd.key === 'COMPOFF' ? 0 : (balances[cd.key] ?? 0);
-              const consumed = Math.max(cd.quota - available, 0);
+              const consumed = Math.max(quota - available, 0);
               return (
                 <div key={cd.key} className="card p-5">
                   <h3 className="mb-3 text-center font-semibold">{cd.label}</h3>
                   <div className="flex items-center gap-3">
-                    <Donut available={available} quota={cd.quota} color={cd.color} />
+                    <Donut available={available} quota={quota} color={cd.color} />
                     <div className="flex-1 space-y-1.5">
-                      <LegendRow color={cd.color} label="Annual quota" value={cd.quota} />
+                      <LegendRow color={cd.color} label="Annual quota" value={quota} />
                       <LegendRow color="#94a3b8" label="Available" value={available} />
                       <LegendRow color="#334155" label="Consumed" value={consumed} />
                     </div>

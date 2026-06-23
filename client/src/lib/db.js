@@ -291,6 +291,20 @@ export const leaves = {
   },
 };
 
+export const leavePolicies = {
+  async list() {
+    const { data } = await supabase.from('leave_policies').select('*').order('leave_type');
+    return (data || []).map((p) => ({ _id: p.id, leaveType: p.leave_type, annualQuota: Number(p.annual_quota), accrualPerMonth: Number(p.accrual_per_month), eligibilityMonths: p.eligibility_months, isActive: p.is_active }));
+  },
+  async upsert(companyId, leaveType, { annualQuota, accrualPerMonth, eligibilityMonths }) {
+    const { error } = await supabase.from('leave_policies').upsert(
+      { company_id: companyId, leave_type: leaveType, annual_quota: annualQuota, accrual_per_month: accrualPerMonth, eligibility_months: eligibilityMonths, is_active: true },
+      { onConflict: 'company_id,leave_type' },
+    );
+    if (error) throw new Error(error.message);
+  },
+};
+
 // ---------- payroll ----------
 export const payroll = {
   async list() {

@@ -1,10 +1,10 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Building2, Layers, Briefcase, Clock, Trash2, Plus, Users } from 'lucide-react';
+import { Building2, Layers, Briefcase, Clock, Trash2, Plus, Users, CalendarClock } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import Loader from '@/components/Loader';
 import { useAuth } from '@/context/AuthContext';
-import { org, shifts as shiftApi, employees as empApi } from '@/lib/db';
+import { org, shifts as shiftApi, employees as empApi, leavePolicies as lpApi } from '@/lib/db';
 import { supabase } from '@/lib/supabaseClient';
 
 const WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -18,6 +18,9 @@ export default function SettingsPage() {
   const [newShift, setNewShift] = useState({ name: '', start: '09:00', end: '18:00' });
   const [empList, setEmpList] = useState([]);
   const [bulk, setBulk] = useState({ shiftId: '', weeklyOff: '', filter: '', picked: [], busy: false, msg: '' });
+  const [pol, setPol] = useState({});
+  const [polBusy, setPolBusy] = useState(false);
+  const [polMsg, setPolMsg] = useState('');
   const [loading, setLoading] = useState(true);
   const [newDept, setNewDept] = useState('');
   const [newDesig, setNewDesig] = useState('');
@@ -27,8 +30,12 @@ export default function SettingsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [d, g, sh, em] = await Promise.all([org.departments(), org.designations(), shiftApi.listAll(), empApi.all().catch(() => [])]);
+      const [d, g, sh, em, lps] = await Promise.all([org.departments(), org.designations(), shiftApi.listAll(), empApi.all().catch(() => []), lpApi.list().catch(() => [])]);
       setDepts(d); setDesigs(g); setShiftList(sh); setEmpList(em || []);
+      const pm = {};
+      (lps || []).forEach((p) => { pm[p.leaveType] = { annualQuota: p.annualQuota, accrualPerMonth: p.accrualPerMonth, eligibilityMonths: p.eligibilityMonths }; });
+      ['EARNED', 'SICK', 'CASUAL'].forEach((t) => { if (!pm[t]) pm[t] = { annualQuota: 0, accrualPerMonth: 0, eligibilityMonths: 0 }; });
+      setPol(pm);
     } catch { /* ignore */ } finally { setLoading(false); }
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -59,6 +66,23 @@ export default function SettingsPage() {
       const n = await shiftApi.assignToEmployees(bulk.picked, patch);
       setBulk((b) => ({ ...b, busy: false, picked: [], msg: `Assigned to ${n} employee(s).` }));
     } catch (e) { setBulk((b) => ({ ...b, busy: false, msg: e.message || 'Failed' })); }
+  };
+
+  const setPolField = (type, key) => (e) => { const v = e.target.value; setPol((p) => ({ ...p, [type]: { ...p[type], [key]: v } })); setPolMsg(''); };
+  const savePolicies = async () => {
+    if (!company?.id) { setPolMsg('No company context'); return; }
+    setPolBusy(true); setPolMsg('');
+    try {
+      for (const t of ['EARNED', 'SICK', 'CASUAL']) {
+        const row = pol[t] || {};
+        await lpApi.upsert(company.id, t, {
+          annualQuota: Number(row.annualQuota) || 0,
+          accrualPerMonth: Number(row.accrualPerMonth) || 0,
+          eligibilityMonths: Number(row.eligibilityMonths) || 0,
+        });
+      }
+      setPolMsg('Leave policies saved.');
+    } catch (e) { setPolMsg(e.message || 'Save failed'); } finally { setPolBusy(false); }
   };
 
   const saveWork = async () => {
@@ -157,6 +181,32 @@ export default function SettingsPage() {
           <div className="mt-3 flex items-center gap-3">
             <button className="btn-primary disabled:opacity-60" disabled={bulk.busy || !bulk.picked.length || (!bulk.shiftId && bulk.weeklyOff === '')} onClick={applyBulk}>{bulk.busy ? 'Assigning…' : `Assign to ${bulk.picked.length} selected`}</button>
             {bulk.msg && <span className="text-sm text-emerald-600">{bulk.msg}</span>}
+          </div>
+        </div>
+
+        <div className="card p-5 lg:col-span-2">
+          <div className="mb-1 flex items-center gap-2"><CalendarClock size={18} className="text-brand-600" /><span className="font-semibold">Leave policies</span></div>
+          <p className="mb-4 text-sm text-slate-400">Drives the automatic monthly leave accrual. Eligibility = months of service completed before accrual begins.</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="text-left text-slate-400">
+                <th className="py-2 pr-4 font-medium">Leave type</th><th className="py-2 pr-4 font-medium">Annual quota</th><th className="py-2 pr-4 font-medium">Accrual / month</th><th className="py-2 pr-4 font-medium">Eligibility (months)</th>
+              </tr></thead>
+              <tbody>
+                {[['EARNED', 'Earned Leave'], ['SICK', 'Sick Leave'], ['CASUAL', 'Casual Leave']].map(([t, label]) => (
+                  <tr key={t} className="border-t dark:border-slate-700">
+                    <td className="py-2 pr-4 font-medium">{label}</td>
+                    <td className="py-2 pr-4"><input type="number" step="0.5" min="0" className="input w-24" value={pol[t]?.annualQuota ?? ''} onChange={setPolField(t, 'annualQuota')} /></td>
+                    <td className="py-2 pr-4"><input type="number" step="0.5" min="0" className="input w-24" value={pol[t]?.accrualPerMonth ?? ''} onChange={setPolField(t, 'accrualPerMonth')} /></td>
+                    <td className="py-2 pr-4"><input type="number" step="1" min="0" className="input w-24" value={pol[t]?.eligibilityMonths ?? ''} onChange={setPolField(t, 'eligibilityMonths')} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-3 flex items-center gap-3">
+            <button className="btn-primary disabled:opacity-60" disabled={polBusy} onClick={savePolicies}>{polBusy ? 'Saving…' : 'Save policies'}</button>
+            {polMsg && <span className="text-sm text-emerald-600">{polMsg}</span>}
           </div>
         </div>
 
