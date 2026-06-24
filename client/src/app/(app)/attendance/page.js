@@ -26,10 +26,19 @@ export default function AttendancePage() {
         </div>
       )}
       {view === 'team' ? <TeamAttendanceGrid /> : (
-        <>
+        user?.employee ? (
+          <>
+            <MyAttendance employeeId={user?.employee} />
+            <CheckInOutCard employeeId={user?.employee} companyId={user?.company} />
+          </>
+        ) : isStaff ? (
+          <>
+            <p className="mb-3 text-sm text-slate-500">Your account isn&apos;t linked to an employee record, so there&apos;s no personal attendance — showing company attendance instead.</p>
+            <TeamAttendanceGrid />
+          </>
+        ) : (
           <MyAttendance employeeId={user?.employee} />
-          <CheckInOutCard employeeId={user?.employee} companyId={user?.company} />
-        </>
+        )
       )}
     </>
   );
