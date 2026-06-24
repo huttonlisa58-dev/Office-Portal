@@ -6,6 +6,7 @@ import Loader from '@/components/Loader';
 import Modal from '@/components/Modal';
 import { StatusBadge } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
+import { cls } from '@/lib/format';
 import { shifts as shiftApi, holidays as holidayApi, shiftRequests } from '@/lib/db';
 
 const WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -60,6 +61,11 @@ export default function MyShiftPage() {
   const move = (delta) => setCursor((c) => { const d = new Date(c.y, c.m + delta, 1); return { y: d.getFullYear(), m: d.getMonth() }; });
   const goToday = () => { const d = new Date(); setCursor({ y: d.getFullYear(), m: d.getMonth() }); };
 
+  const [pickOpen, setPickOpen] = useState(false);
+  const [pickMode, setPickMode] = useState('month');
+  const [pickYear, setPickYear] = useState(() => new Date().getFullYear());
+  const yearBase = pickYear - (pickYear % 12);
+
   const { shift, weeklyOff } = data;
 
   return (
@@ -67,7 +73,39 @@ export default function MyShiftPage() {
       <PageBanner icon={CalendarDays} title="My shift">
         <div className="flex items-center gap-2">
           <button onClick={() => move(-1)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/20 hover:bg-white/30" aria-label="Previous month"><ChevronLeft size={18} /></button>
-          <button onClick={goToday} className="min-w-[120px] rounded-lg bg-white px-3 py-1.5 text-center text-sm font-semibold text-sky-700 hover:bg-sky-50">{MONTHS[cursor.m]} {cursor.y}</button>
+          <div className="relative">
+            <button onClick={() => { setPickYear(cursor.y); setPickMode('month'); setPickOpen((o) => !o); }} className="min-w-[120px] rounded-lg bg-white px-3 py-1.5 text-center text-sm font-semibold text-sky-700 hover:bg-sky-50">{MONTHS[cursor.m]} {cursor.y}</button>
+            {pickOpen && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setPickOpen(false)} />
+                <div className="absolute left-1/2 z-40 mt-2 w-72 -translate-x-1/2 rounded-2xl border bg-white p-3 text-slate-700 shadow-xl dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  <div className="mb-2 flex items-center justify-between">
+                    <button onClick={() => setPickYear((y) => (pickMode === 'year' ? y - 12 : y - 1))} className="grid h-7 w-7 place-items-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"><ChevronLeft size={16} /></button>
+                    <button onClick={() => setPickMode((m) => (m === 'month' ? 'year' : 'month'))} className="rounded-lg px-3 py-1 text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-700">{pickMode === 'month' ? pickYear : `${yearBase} – ${yearBase + 11}`}</button>
+                    <button onClick={() => setPickYear((y) => (pickMode === 'year' ? y + 12 : y + 1))} className="grid h-7 w-7 place-items-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"><ChevronRight size={16} /></button>
+                  </div>
+                  {pickMode === 'month' ? (
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {MONTHS.map((mn, mi) => {
+                        const isCur = cursor.y === pickYear && cursor.m === mi;
+                        const isThisMonth = today.getFullYear() === pickYear && today.getMonth() === mi;
+                        return <button key={mn} onClick={() => { setCursor({ y: pickYear, m: mi }); setPickOpen(false); }} className={cls('rounded-lg px-2 py-2 text-sm', isCur ? 'bg-sky-500 font-semibold text-white' : isThisMonth ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/40' : 'hover:bg-slate-100 dark:hover:bg-slate-700')}>{mn.slice(0, 3)}</button>;
+                      })}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {Array.from({ length: 12 }, (_, i) => yearBase + i).map((yy) => (
+                        <button key={yy} onClick={() => { setPickYear(yy); setPickMode('month'); }} className={cls('rounded-lg px-2 py-2 text-sm', yy === cursor.y ? 'bg-sky-500 font-semibold text-white' : yy === today.getFullYear() ? 'bg-sky-50 text-sky-700 dark:bg-sky-950/40' : 'hover:bg-slate-100 dark:hover:bg-slate-700')}>{yy}</button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="mt-2 border-t pt-2 text-center dark:border-slate-700">
+                    <button onClick={() => { goToday(); setPickOpen(false); }} className="text-sm font-medium text-sky-600 hover:text-sky-700">Go to today</button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
           <button onClick={() => move(1)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/20 hover:bg-white/30" aria-label="Next month"><ChevronRight size={18} /></button>
           {employeeId && <button onClick={() => setReq((r) => ({ ...r, open: true, err: '' }))} className="ml-2 inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-sky-700 hover:bg-sky-50"><Repeat size={14} /> Request change</button>}
         </div>
