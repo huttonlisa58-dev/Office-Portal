@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, CalendarRange } from 'lucide-react';
 import { attendance as attApi } from '@/lib/db';
+import { useAuth } from '@/context/AuthContext';
 import Loader from '@/components/Loader';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -30,6 +31,7 @@ function eachDate(from, to, cb) {
 }
 
 export default function TeamAttendanceGrid() {
+  const { user } = useAuth();
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -38,8 +40,8 @@ export default function TeamAttendanceGrid() {
 
   useEffect(() => {
     setLoading(true);
-    attApi.month(year, month).then(setData).catch(() => setData(null)).finally(() => setLoading(false));
-  }, [year, month]);
+    attApi.month(year, month, { role: user?.role, employeeId: user?.employee }).then(setData).catch(() => setData(null)).finally(() => setLoading(false));
+  }, [year, month, user]);
 
   const days = useMemo(() => new Date(Date.UTC(year, month + 1, 0)).getUTCDate(), [year, month]);
   const todayStr = now.toISOString().slice(0, 10);

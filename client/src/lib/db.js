@@ -193,28 +193,53 @@ export const attendance = {
     if (!data) return null;
     return { id: data.id, checkInAt: data.check_in_at, checkOutAt: data.check_out_at, status: data.status, workedMinutes: data.worked_minutes };
   },
-  async month(year, monthIndex) {
+  async month(year, monthIndex, viewer = {}) {
     const start = new Date(Date.UTC(year, monthIndex, 1)).toISOString().slice(0, 10);
     const end = new Date(Date.UTC(year, monthIndex + 1, 0)).toISOString().slice(0, 10);
     const [emps, att, lv, hol, punches] = await Promise.all([
-      supabase.from('employees').select('id,first_name,last_name,employee_code').eq('status', 'ACTIVE').order('employee_code'),
+      supabase.from('employees').select('id,first_name,last_name,employee_code,manager_id').eq('status', 'ACTIVE').order('employee_code'),
       supabase.from('attendance').select('employee_id,work_date,status').gte('work_date', start).lte('work_date', end),
       supabase.from('leaves').select('employee_id,from_date,to_date,leave_type').eq('status', 'APPROVED').lte('from_date', end).gte('to_date', start),
       supabase.from('holidays').select('date,name').gte('date', start).lte('date', end),
       supabase.from('attendance_punches').select('employee_id,work_date').gte('work_date', start).lte('work_date', end),
     ]);
+    const allEmps = emps.data || [];
+
+    // Role-based scope: HR / company admin / super admin see everyone.
+    // A manager sees their own team — themselves + everyone below them in the
+    // reporting tree (so a top/"general" manager naturally sees all, a team lead just their branch).
+    const role = viewer.role;
+    const seesAll = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR'].includes(role);
+    let allowed = null; // null => no restriction
+    if (!seesAll && role === 'MANAGER' && viewer.employeeId) {
+      const childrenBy = {};
+      allEmps.forEach((e) => { if (e.manager_id) (childrenBy[e.manager_id] = childrenBy[e.manager_id] || []).push(e.id); });
+      const set = new Set([viewer.employeeId]);
+      const stack = [viewer.employeeId];
+      while (stack.length) { const cur = stack.pop(); (childrenBy[cur] || []).forEach((cid) => { if (!set.has(cid)) { set.add(cid); stack.push(cid); } }); }
+      allowed = set;
+    } else if (!seesAll && viewer.employeeId) {
+      allowed = new Set([viewer.employeeId]);
+    }
+    const inScope = (id) => allowed === null || allowed.has(id);
+
+    const scopedEmps = allEmps.filter((e) => inScope(e.id));
+    const attRows = (att.data || []).filter((a) => inScope(a.employee_id));
+    const lvRows = (lv.data || []).filter((l) => inScope(l.employee_id));
+
     // Mark days with a punch as PRESENT (new check-in/out system), merging with legacy attendance rows
-    const existing = new Set((att.data || []).map((a) => `${a.employee_id}|${a.work_date}`));
+    const existing = new Set(attRows.map((a) => `${a.employee_id}|${a.work_date}`));
     const seen = new Set();
     const punchPresent = [];
     (punches.data || []).forEach((p) => {
+      if (!inScope(p.employee_id)) return;
       const key = `${p.employee_id}|${p.work_date}`;
       if (!existing.has(key) && !seen.has(key)) { seen.add(key); punchPresent.push({ employee_id: p.employee_id, work_date: p.work_date, status: 'PRESENT' }); }
     });
     return {
       start, end,
-      employees: (emps.data || []).map((e) => ({ id: e.id, name: `${e.first_name} ${e.last_name || ''}`.trim(), code: e.employee_code })),
-      attendance: [...(att.data || []), ...punchPresent], leaves: lv.data || [], holidays: hol.data || [],
+      employees: scopedEmps.map((e) => ({ id: e.id, name: `${e.first_name} ${e.last_name || ''}`.trim(), code: e.employee_code })),
+      attendance: [...attRows, ...punchPresent], leaves: lvRows, holidays: hol.data || [],
     };
   },
   async mine(employeeId, year, monthIndex) {
