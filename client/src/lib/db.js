@@ -159,7 +159,7 @@ export const employees = {
     const { data } = await supabase.from('employees')
       .select('*, department:departments(name), designation:designations(title)')
       .eq('status', 'ACTIVE').order('employee_code');
-    return (data || []).map(mEmp);
+    return (data || []).map((r) => ({ ...mEmp(r), managerId: r.manager_id || null }));
   },
   all: async () => {
     const { data } = await supabase.from('employees').select('id,first_name,last_name,employee_code').order('first_name');

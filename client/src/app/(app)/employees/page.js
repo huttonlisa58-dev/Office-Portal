@@ -109,40 +109,76 @@ function EmployeeList({ canManage, user }) {
   );
 }
 
+const ORG_CSS = `
+.org-tree ul { position: relative; padding: 24px 0 0 0; margin: 0; display: flex; justify-content: center; }
+.org-tree li { list-style: none; position: relative; padding: 24px 12px 0 12px; text-align: center; }
+.org-tree li::before, .org-tree li::after { content: ''; position: absolute; top: 0; right: 50%; border-top: 1px solid #cbd5e1; width: 50%; height: 24px; }
+.org-tree li::after { right: auto; left: 50%; border-left: 1px solid #cbd5e1; }
+.org-tree li:only-child::before, .org-tree li:only-child::after { display: none; }
+.org-tree li:first-child::before, .org-tree li:last-child::after { border: 0 none; }
+.org-tree li:last-child::before { border-right: 1px solid #cbd5e1; border-radius: 0 6px 0 0; }
+.org-tree li:first-child::after { border-radius: 6px 0 0 0; }
+.org-tree ul ul::before { content: ''; position: absolute; top: 0; left: 50%; border-left: 1px solid #cbd5e1; width: 0; height: 24px; }
+.org-tree > ul { padding-top: 0; }
+.org-tree > ul > li { padding-top: 0; }
+.org-tree > ul > li::before, .org-tree > ul > li::after { display: none; }
+.org-tree .node { display: inline-block; vertical-align: top; }
+`;
+
+function OrgCard({ e }) {
+  return (
+    <div className="inline-flex w-40 flex-col items-center rounded-xl border bg-white p-2.5 text-center shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className={cls('grid h-10 w-10 place-items-center rounded-full text-xs font-semibold text-white', col(e.firstName))}>{initials(`${e.firstName} ${e.lastName || ''}`)}</div>
+      <div className="mt-1.5 w-full truncate text-xs font-semibold" title={`${e.firstName} ${e.lastName || ''}`}>{e.firstName} {e.lastName}</div>
+      <div className="w-full truncate text-[10px] text-slate-400" title={e.designation?.title || ''}>{e.designation?.title || 'Employee'}</div>
+      {e.department?.name && <div className="w-full truncate text-[10px] text-slate-300 dark:text-slate-500">{e.department.name}</div>}
+    </div>
+  );
+}
+
+function OrgNode({ e, childrenMap, seen }) {
+  if (seen.has(e._id)) return null;
+  const next = new Set(seen); next.add(e._id);
+  const kids = childrenMap[e._id] || [];
+  return (
+    <li>
+      <div className="node"><OrgCard e={e} /></div>
+      {kids.length > 0 && <ul>{kids.map((k) => <OrgNode key={k._id} e={k} childrenMap={childrenMap} seen={next} />)}</ul>}
+    </li>
+  );
+}
+
 function OrgChart() {
   const { company } = useAuth();
   const [emps, setEmps] = useState(null);
   useEffect(() => { empApi.orgData().then(setEmps).catch(() => setEmps([])); }, []);
   if (!emps) return <Loader />;
+  if (emps.length === 0) return <div className="card p-10 text-center text-slate-400">No active employees to chart.</div>;
 
-  const byDept = {};
-  emps.forEach((e) => { const d = e.department?.name || 'Unassigned'; (byDept[d] = byDept[d] || []).push(e); });
-  const depts = Object.keys(byDept).sort();
+  const ids = new Set(emps.map((e) => e._id));
+  const childrenMap = {};
+  emps.forEach((e) => {
+    const hasMgr = e.managerId && e.managerId !== e._id && ids.has(e.managerId);
+    const key = hasMgr ? e.managerId : '__root__';
+    (childrenMap[key] = childrenMap[key] || []).push(e);
+  });
+  const roots = childrenMap.__root__ || [];
 
   return (
     <div className="card overflow-x-auto p-8">
-      <div className="flex min-w-max flex-col items-center">
-        <div className="rounded-xl border-2 border-sky-300 bg-sky-50 px-5 py-2.5 text-center font-semibold text-sky-700 shadow-sm dark:bg-sky-950/40 dark:text-sky-300">
-          {company?.name || 'Company'}
-        </div>
-        <div className="h-6 w-px bg-slate-300" />
-        <div className="flex items-start gap-6">
-          {depts.map((d) => (
-            <div key={d} className="flex flex-col items-center">
-              <div className="rounded-lg border bg-white px-4 py-2 text-center text-sm font-medium shadow-sm dark:bg-slate-900">{d}<div className="text-[10px] text-slate-400">{byDept[d].length} members</div></div>
-              <div className="h-5 w-px bg-slate-300" />
-              <div className="flex flex-wrap justify-center gap-3" style={{ maxWidth: 320 }}>
-                {byDept[d].map((e) => (
-                  <div key={e._id} className="w-32 rounded-lg border bg-white p-2 text-center shadow-sm dark:bg-slate-900">
-                    <div className={cls('mx-auto grid h-9 w-9 place-items-center rounded-full text-xs font-semibold text-white', col(e.firstName))}>{initials(`${e.firstName} ${e.lastName || ''}`)}</div>
-                    <div className="mt-1 truncate text-xs font-medium">{e.firstName} {e.lastName}</div>
-                    <div className="truncate text-[10px] text-slate-400">{e.designation?.title || 'Employee'}</div>
-                  </div>
-                ))}
+      <style>{ORG_CSS}</style>
+      <div className="org-tree min-w-max">
+        <ul>
+          <li>
+            <div className="node">
+              <div className="inline-flex w-44 flex-col items-center rounded-xl border-2 border-sky-300 bg-sky-50 p-2.5 text-center text-sky-700 shadow-sm dark:bg-sky-950/40 dark:text-sky-300">
+                <div className="text-sm font-semibold leading-tight">{company?.name || 'Company'}</div>
+                <div className="text-[10px] text-sky-500">{emps.length} employees</div>
               </div>
             </div>
-          ))}
-        </div>
+            <ul>{roots.map((r) => <OrgNode key={r._id} e={r} childrenMap={childrenMap} seen={new Set()} />)}</ul>
+          </li>
+        </ul>
       </div>
     </div>
   );
