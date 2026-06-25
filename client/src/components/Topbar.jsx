@@ -85,7 +85,7 @@ export default function Topbar({ onMenu }) {
   const loadNotifs = useCallback(async () => {
     try { const r = await notifications.list(); setItems(r.items); setUnread(r.unread); } catch { /* ignore */ }
   }, []);
-  useEffect(() => { loadNotifs(); }, [loadNotifs]);
+  useEffect(() => { loadNotifs(); const id = setInterval(loadNotifs, 60000); return () => clearInterval(id); }, [loadNotifs]);
 
   useEffect(() => {
     const onDoc = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) { setNotifOpen(false); setMenuOpen(false); } };
@@ -110,7 +110,7 @@ export default function Topbar({ onMenu }) {
       {/* Notifications */}
       <div className="relative">
         <button className="relative btn-ghost p-2" aria-label="Notifications"
-          onClick={() => { setNotifOpen((o) => !o); setMenuOpen(false); }}>
+          onClick={() => { setNotifOpen((o) => { const n = !o; if (n) loadNotifs(); return n; }); setMenuOpen(false); }}>
           <Bell size={18} />
           {unread > 0 && (
             <span className="absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-semibold text-white">
