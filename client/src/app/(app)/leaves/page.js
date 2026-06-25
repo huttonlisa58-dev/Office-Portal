@@ -8,7 +8,8 @@ import { StatusBadge } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
 import { leaves as leaveApi, leavePolicies } from '@/lib/db';
 
-const TYPES = ['CASUAL', 'SICK', 'EARNED', 'UNPAID'];
+const TYPES = ['CASUAL', 'SICK', 'EARNED', 'COMPOFF', 'UNPAID'];
+const TYPE_LABEL = { CASUAL: 'Casual', SICK: 'Sick', EARNED: 'Earned', COMPOFF: 'Comp-off', UNPAID: 'Unpaid (LOP)' };
 const fmt = (d) => d ? new Date(d).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 // quota per type (annual)
@@ -114,8 +115,8 @@ export default function LeavesPage() {
         <>
           <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {CARDS.map((cd) => {
-              const quota = quotas[cd.key] ?? cd.quota;
               const available = cd.key === 'COMPOFF' ? (balances.COMPOFF ?? 0) : (balances[cd.key] ?? 0);
+              const quota = cd.key === 'COMPOFF' ? Math.max(available, 0) : (quotas[cd.key] ?? cd.quota);
               const consumed = Math.max(quota - available, 0);
               return (
                 <div key={cd.key} className="card p-5">
@@ -189,7 +190,7 @@ export default function LeavesPage() {
           {err && <div className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{err}</div>}
           <div><label className="label">Leave type</label>
             <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-              {TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              {TYPES.map((t) => <option key={t} value={t}>{TYPE_LABEL[t] || t}</option>)}
             </select>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
