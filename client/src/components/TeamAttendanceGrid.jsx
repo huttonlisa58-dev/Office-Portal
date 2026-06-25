@@ -52,7 +52,7 @@ export default function TeamAttendanceGrid() {
     data.attendance.forEach((a) => att.set(`${a.employee_id}|${a.work_date}`, a.status));
     const leave = new Map(); // emp|date -> type
     data.leaves.forEach((l) => eachDate(l.from_date > data.start ? l.from_date : data.start, l.to_date < data.end ? l.to_date : data.end, (d) => leave.set(`${l.employee_id}|${d}`, l.leave_type)));
-    const holiday = new Set(data.holidays.map((h) => h.date));
+    const holidayName = new Map(data.holidays.map((h) => [h.date, h.name]));
 
     return data.employees.map((emp) => {
       const cells = [];
@@ -60,20 +60,22 @@ export default function TeamAttendanceGrid() {
         const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dow = new Date(Date.UTC(year, month, day)).getUTCDay();
         const weekend = dow === 0 || dow === 6;
-        let code = '';
         const st = att.get(`${emp.id}|${date}`);
         const lv = leave.get(`${emp.id}|${date}`);
-        if (holiday.has(date)) code = 'H';
-        else if (lv) code = LEAVE_CODE[lv] || 'L';
-        else if (st === 'PRESENT') code = 'P';
-        else if (st === 'LATE') code = 'L';
-        else if (st === 'HALF_DAY') code = 'HD';
-        else if (weekend) code = 'WO';
-        else if (date < todayStr) code = 'A';
-        else code = '';
-        cells.push({ date, code, weekend });
+        const isHol = holidayName.has(date);
+        const worked = st === 'PRESENT' || st === 'LATE' || st === 'HALF_DAY';
+        let code = '', title = '', workedOnOff = false;
+        if (worked) {
+          code = st === 'PRESENT' ? 'P' : st === 'LATE' ? 'L' : 'HD';
+          if (isHol) { workedOnOff = true; title = `Worked on holiday: ${holidayName.get(date) || 'Holiday'}`; }
+          else if (weekend) { workedOnOff = true; title = 'Worked on week-off'; }
+        } else if (isHol) { code = 'H'; title = holidayName.get(date) || 'Holiday'; }
+        else if (lv) { code = LEAVE_CODE[lv] || 'L'; title = `${lv[0]}${lv.slice(1).toLowerCase()} leave`; }
+        else if (weekend) { code = 'WO'; title = 'Week off'; }
+        else if (date < todayStr) { code = 'A'; title = 'Absent'; }
+        else { code = ''; }
+        cells.push({ date, code, title, workedOnOff, weekend });
       }
-      // simple present count
       const present = cells.filter((c) => c.code === 'P' || c.code === 'L' || c.code === 'HD').length;
       return { emp, cells, present };
     });
@@ -104,6 +106,9 @@ export default function TeamAttendanceGrid() {
             <span className={`grid h-4 w-4 place-items-center rounded text-[9px] font-bold ${CELL[c]}`}>{c}</span>{label}
           </span>
         ))}
+        <span className="inline-flex items-center gap-1.5">
+          <span className="grid h-4 w-4 place-items-center rounded text-[9px] font-bold outline outline-2 outline-amber-500 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">P</span>Worked on off-day/holiday
+        </span>
       </div>
 
       {loading ? <Loader /> : !matrix ? (
@@ -137,7 +142,7 @@ export default function TeamAttendanceGrid() {
                   </td>
                   {cells.map((c, i) => (
                     <td key={i} className="border-b border-l p-0.5 text-center" style={{ minWidth: 30 }}>
-                      <div className={`mx-auto grid h-6 w-7 place-items-center rounded text-[9px] font-bold ${CELL[c.code] || ''}`}>{c.code}</div>
+                      <div title={c.title} className={`mx-auto grid h-6 w-7 place-items-center rounded text-[9px] font-bold ${CELL[c.code] || ''} ${c.workedOnOff ? 'outline outline-2 outline-amber-500' : ''}`}>{c.code}</div>
                     </td>
                   ))}
                   <td className="border-b border-l px-3 text-center font-semibold text-emerald-600">{present}</td>
