@@ -668,7 +668,7 @@ export const assets = {
 export const expenses = {
   async list(viewer = {}) {
     const sel = '*, employee:employees(first_name,last_name,employee_code)';
-    const map = (x) => ({ _id: x.id, category: x.category, amount: x.amount, currency: x.currency, date: x.expense_date, description: x.description, status: x.status, decidedAt: x.decided_at, decisionNote: x.decision_note, employeeId: x.employee_id, employee: x.employee ? { name: `${x.employee.first_name} ${x.employee.last_name || ''}`.trim(), code: x.employee.employee_code } : null });
+    const map = (x) => ({ _id: x.id, category: x.category, amount: x.amount, currency: x.currency, date: x.expense_date, description: x.description, status: x.status, decidedAt: x.decided_at, decisionNote: x.decision_note, receiptPath: x.receipt_path || null, employeeId: x.employee_id, employee: x.employee ? { name: `${x.employee.first_name} ${x.employee.last_name || ''}`.trim(), code: x.employee.employee_code } : null });
     const role = viewer.role;
     const seesAll = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR'].includes(role);
     if (seesAll) {
@@ -690,6 +690,20 @@ export const expenses = {
     return [];
   },
   async create(p) { const { error } = await supabase.from('expenses').insert(p); if (error) throw new Error(error.message); },
+  async uploadReceipt(file, companyId) {
+    if (!file || !companyId) return null;
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${companyId}/${Date.now()}_${safe}`;
+    const { error } = await supabase.storage.from('receipts').upload(path, file, { upsert: false });
+    if (error) throw new Error(error.message);
+    return path;
+  },
+  async receiptUrl(path) {
+    if (!path) return null;
+    const { data, error } = await supabase.storage.from('receipts').createSignedUrl(path, 300);
+    if (error) throw new Error(error.message);
+    return data?.signedUrl || null;
+  },
   async decide(id, status, note) { const { error } = await supabase.rpc('decide_expense', { p_id: id, p_decision: status, p_note: note || null }); if (error) throw new Error(error.message); },
 };
 

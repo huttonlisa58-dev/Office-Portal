@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Receipt, Plus, Check, X } from 'lucide-react';
+import { Receipt, Plus, Check, X, Paperclip } from 'lucide-react';
 import PageBanner from '@/components/PageBanner';
 import Loader from '@/components/Loader';
 import Modal from '@/components/Modal';
@@ -28,6 +28,7 @@ export default function ExpensesPage() {
   useEffect(() => { load(); }, [load]);
 
   const decide = async (id, status) => { try { await api.decide(id, status); load(); } catch (e) { alert(e.message); } };
+  const openReceipt = async (path) => { try { const url = await api.receiptUrl(path); if (url) window.open(url, '_blank', 'noopener'); } catch (e) { alert(e.message || 'Could not open receipt'); } };
 
   const summary = items.reduce((a, x) => { a[x.status] = (a[x.status] || 0) + 1; if (x.status === 'APPROVED') a.approvedAmt += Number(x.amount || 0); if (x.status === 'PENDING') a.pendingAmt += Number(x.amount || 0); return a; }, { PENDING: 0, APPROVED: 0, REJECTED: 0, approvedAmt: 0, pendingAmt: 0 });
   const shown = filter === 'ALL' ? items : items.filter((x) => x.status === filter);
@@ -57,11 +58,11 @@ export default function ExpensesPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="border-b text-left text-slate-400">
-                {['Date', 'Employee', 'Category', 'Amount', 'Description', 'Status'].map((h) => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}
+                {['Date', 'Employee', 'Category', 'Amount', 'Description', 'Receipt', 'Status'].map((h) => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}
                 {canDecide && <th className="px-5 py-3 font-medium text-right">Action</th>}
               </tr></thead>
               <tbody>
-                {shown.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400">No expenses{filter !== 'ALL' ? ` (${filter.toLowerCase()})` : ' submitted'}.</td></tr>}
+                {shown.length === 0 && <tr><td colSpan={8} className="px-5 py-10 text-center text-slate-400">No expenses{filter !== 'ALL' ? ` (${filter.toLowerCase()})` : ' submitted'}.</td></tr>}
                 {shown.map((x) => (
                   <tr key={x._id} className="border-b last:border-0">
                     <td className="px-5 py-3 font-medium">{fmt(x.date)}</td>
@@ -69,6 +70,7 @@ export default function ExpensesPage() {
                     <td className="px-5 py-3 text-slate-500">{x.category || '—'}</td>
                     <td className="px-5 py-3 font-semibold">{money(x.amount, x.currency)}</td>
                     <td className="px-5 py-3 text-slate-500">{x.description || '—'}</td>
+                    <td className="px-5 py-3">{x.receiptPath ? <button className="inline-flex items-center gap-1 text-sky-600 hover:underline" onClick={() => openReceipt(x.receiptPath)}><Paperclip size={13} /> View</button> : <span className="text-slate-300">—</span>}</td>
                     <td className="px-5 py-3"><span className={`badge ${tone(x.status)}`}>{x.status}</span></td>
                     {canDecide && <td className="px-5 py-3"><div className="flex justify-end gap-1">
                       {x.status === 'PENDING' ? (<>
@@ -92,11 +94,17 @@ export default function ExpensesPage() {
 
 function ExpenseModal({ companyId, employeeId, onClose, onDone }) {
   const [form, setForm] = useState({ category: 'Travel', amount: '', currency: 'INR', date: new Date().toISOString().slice(0, 10), description: '' });
+  const [file, setFile] = useState(null);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const save = async () => {
     setErr(''); setBusy(true);
     try {
-      await api.create({ company_id: companyId, employee_id: employeeId, category: form.category, amount: Number(form.amount || 0), currency: form.currency, expense_date: form.date, description: form.description || null, status: 'PENDING' });
+      let receipt_path = null;
+      if (file) {
+        if (file.size > 8 * 1024 * 1024) { setErr('File too large (max 8MB)'); setBusy(false); return; }
+        receipt_path = await api.uploadReceipt(file, companyId);
+      }
+      await api.create({ company_id: companyId, employee_id: employeeId, category: form.category, amount: Number(form.amount || 0), currency: form.currency, expense_date: form.date, description: form.description || null, status: 'PENDING', receipt_path });
       onClose(); onDone();
     } catch (e) { setErr(e.message || 'Could not submit'); } finally { setBusy(false); }
   };
@@ -113,6 +121,10 @@ function ExpenseModal({ companyId, employeeId, onClose, onDone }) {
           <div><label className="label">Currency</label><select className="input" value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })}>{['INR', 'USD', 'EUR', 'GBP', 'AED'].map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
         </div>
         <div><label className="label">Description</label><textarea className="input" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+        <div><label className="label">Receipt <span className="font-normal text-slate-400">(optional, max 8MB)</span></label>
+          <input type="file" className="input" accept="image/*,application/pdf,.csv,.xlsx,.xls,.doc,.docx,.zip" onChange={(e) => setFile(e.target.files?.[0] || null)} />
+          {file && <p className="mt-1 text-xs text-slate-400">{file.name} · {(file.size / 1024 / 1024).toFixed(2)} MB</p>}
+        </div>
         <div className="flex justify-end gap-2 pt-1"><button className="btn-outline" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={busy || !form.amount} onClick={save}>Submit</button></div>
       </div>
     </Modal>
