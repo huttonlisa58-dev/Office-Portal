@@ -197,6 +197,9 @@ export const attendance = {
   async month(year, monthIndex, viewer = {}) {
     const start = new Date(Date.UTC(year, monthIndex, 1)).toISOString().slice(0, 10);
     const end = new Date(Date.UTC(year, monthIndex + 1, 0)).toISOString().slice(0, 10);
+    return this.range(start, end, viewer);
+  },
+  async range(start, end, viewer = {}) {
     const [emps, att, lv, hol, punches] = await Promise.all([
       supabase.from('employees').select('id,first_name,last_name,employee_code,manager_id').eq('status', 'ACTIVE').order('employee_code'),
       supabase.from('attendance').select('employee_id,work_date,status').gte('work_date', start).lte('work_date', end),
