@@ -4,7 +4,7 @@ import { Building2, Layers, Briefcase, Clock, Trash2, Plus, Users, CalendarClock
 import PageHeader from '@/components/PageHeader';
 import Loader from '@/components/Loader';
 import { useAuth } from '@/context/AuthContext';
-import { org, shifts as shiftApi, employees as empApi, leavePolicies as lpApi } from '@/lib/db';
+import { org, shifts as shiftApi, employees as empApi, leavePolicies as lpApi, leaves as leaveApi } from '@/lib/db';
 import { supabase } from '@/lib/supabaseClient';
 
 const WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -33,8 +33,8 @@ export default function SettingsPage() {
       const [d, g, sh, em, lps] = await Promise.all([org.departments(), org.designations(), shiftApi.listAll(), empApi.all().catch(() => []), lpApi.list().catch(() => [])]);
       setDepts(d); setDesigs(g); setShiftList(sh); setEmpList(em || []);
       const pm = {};
-      (lps || []).forEach((p) => { pm[p.leaveType] = { annualQuota: p.annualQuota, accrualPerMonth: p.accrualPerMonth, eligibilityMonths: p.eligibilityMonths }; });
-      ['EARNED', 'SICK', 'CASUAL'].forEach((t) => { if (!pm[t]) pm[t] = { annualQuota: 0, accrualPerMonth: 0, eligibilityMonths: 0 }; });
+      (lps || []).forEach((p) => { pm[p.leaveType] = { annualQuota: p.annualQuota, accrualPerMonth: p.accrualPerMonth, eligibilityMonths: p.eligibilityMonths, carryForwardCap: p.carryForwardCap ?? '' }; });
+      ['EARNED', 'SICK', 'CASUAL'].forEach((t) => { if (!pm[t]) pm[t] = { annualQuota: 0, accrualPerMonth: 0, eligibilityMonths: 0, carryForwardCap: '' }; });
       setPol(pm);
     } catch { /* ignore */ } finally { setLoading(false); }
   }, []);
@@ -79,10 +79,21 @@ export default function SettingsPage() {
           annualQuota: Number(row.annualQuota) || 0,
           accrualPerMonth: Number(row.accrualPerMonth) || 0,
           eligibilityMonths: Number(row.eligibilityMonths) || 0,
+          carryForwardCap: row.carryForwardCap === '' || row.carryForwardCap == null ? null : Number(row.carryForwardCap),
         });
       }
       setPolMsg('Leave policies saved.');
     } catch (e) { setPolMsg(e.message || 'Save failed'); } finally { setPolBusy(false); }
+  };
+
+  const [cfBusy, setCfBusy] = useState(false);
+  const runCarryForward = async () => {
+    if (!window.confirm('Carry forward last year\u2019s remaining balances into this year (capped per policy)? This runs once per employee/type and is safe to repeat.')) return;
+    setCfBusy(true); setPolMsg('');
+    try {
+      const res = await leaveApi.runCarryForward();
+      setPolMsg(`Carry-forward done — ${res?.carried ?? 0} credit(s) across ${res?.employees_processed ?? 0} employee(s).`);
+    } catch (e) { setPolMsg(e.message || 'Carry-forward failed'); } finally { setCfBusy(false); }
   };
 
   const saveWork = async () => {
@@ -190,7 +201,7 @@ export default function SettingsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="text-left text-slate-400">
-                <th className="py-2 pr-4 font-medium">Leave type</th><th className="py-2 pr-4 font-medium">Annual quota</th><th className="py-2 pr-4 font-medium">Accrual / month</th><th className="py-2 pr-4 font-medium">Eligibility (months)</th>
+                <th className="py-2 pr-4 font-medium">Leave type</th><th className="py-2 pr-4 font-medium">Annual quota</th><th className="py-2 pr-4 font-medium">Accrual / month</th><th className="py-2 pr-4 font-medium">Eligibility (months)</th><th className="py-2 pr-4 font-medium">Carry-forward cap</th>
               </tr></thead>
               <tbody>
                 {[['EARNED', 'Earned Leave'], ['SICK', 'Sick Leave'], ['CASUAL', 'Casual Leave']].map(([t, label]) => (
@@ -199,15 +210,18 @@ export default function SettingsPage() {
                     <td className="py-2 pr-4"><input type="number" step="0.5" min="0" className="input w-24" value={pol[t]?.annualQuota ?? ''} onChange={setPolField(t, 'annualQuota')} /></td>
                     <td className="py-2 pr-4"><input type="number" step="0.5" min="0" className="input w-24" value={pol[t]?.accrualPerMonth ?? ''} onChange={setPolField(t, 'accrualPerMonth')} /></td>
                     <td className="py-2 pr-4"><input type="number" step="1" min="0" className="input w-24" value={pol[t]?.eligibilityMonths ?? ''} onChange={setPolField(t, 'eligibilityMonths')} /></td>
+                    <td className="py-2 pr-4"><input type="number" step="0.5" min="0" placeholder="none" className="input w-24" value={pol[t]?.carryForwardCap ?? ''} onChange={setPolField(t, 'carryForwardCap')} /></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="mt-3 flex items-center gap-3">
+          <div className="mt-3 flex flex-wrap items-center gap-3">
             <button className="btn-primary disabled:opacity-60" disabled={polBusy} onClick={savePolicies}>{polBusy ? 'Saving…' : 'Save policies'}</button>
+            <button className="btn-outline disabled:opacity-60" disabled={cfBusy} onClick={runCarryForward}>{cfBusy ? 'Running…' : 'Run carry-forward (last year → this year)'}</button>
             {polMsg && <span className="text-sm text-emerald-600">{polMsg}</span>}
           </div>
+          <p className="mt-2 text-xs text-slate-400">Carry-forward also runs automatically on Jan 1. Leave the cap blank to disable carry-forward for a type.</p>
         </div>
 
         <div className="card p-5 lg:col-span-2">

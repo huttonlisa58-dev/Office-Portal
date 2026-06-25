@@ -313,6 +313,11 @@ export const leaves = {
     if (error) throw new Error(error.message);
     return data;
   },
+  async runCarryForward(year) {
+    const { data, error } = await supabase.rpc('run_company_leave_carry_forward', year ? { p_year: year } : {});
+    if (error) throw new Error(error.message);
+    return data;
+  },
   async transactions(employeeId) {
     if (!employeeId) return [];
     const { data } = await supabase.from('leave_transactions').select('*').eq('employee_id', employeeId).order('created_at', { ascending: false }).limit(50);
@@ -323,13 +328,12 @@ export const leaves = {
 export const leavePolicies = {
   async list() {
     const { data } = await supabase.from('leave_policies').select('*').order('leave_type');
-    return (data || []).map((p) => ({ _id: p.id, leaveType: p.leave_type, annualQuota: Number(p.annual_quota), accrualPerMonth: Number(p.accrual_per_month), eligibilityMonths: p.eligibility_months, isActive: p.is_active }));
+    return (data || []).map((p) => ({ _id: p.id, leaveType: p.leave_type, annualQuota: Number(p.annual_quota), accrualPerMonth: Number(p.accrual_per_month), eligibilityMonths: p.eligibility_months, carryForwardCap: p.carry_forward_cap == null ? null : Number(p.carry_forward_cap), isActive: p.is_active }));
   },
-  async upsert(companyId, leaveType, { annualQuota, accrualPerMonth, eligibilityMonths }) {
-    const { error } = await supabase.from('leave_policies').upsert(
-      { company_id: companyId, leave_type: leaveType, annual_quota: annualQuota, accrual_per_month: accrualPerMonth, eligibility_months: eligibilityMonths, is_active: true },
-      { onConflict: 'company_id,leave_type' },
-    );
+  async upsert(companyId, leaveType, { annualQuota, accrualPerMonth, eligibilityMonths, carryForwardCap }) {
+    const row = { company_id: companyId, leave_type: leaveType, annual_quota: annualQuota, accrual_per_month: accrualPerMonth, eligibility_months: eligibilityMonths, is_active: true };
+    if (carryForwardCap !== undefined) row.carry_forward_cap = carryForwardCap === '' || carryForwardCap == null ? null : carryForwardCap;
+    const { error } = await supabase.from('leave_policies').upsert(row, { onConflict: 'company_id,leave_type' });
     if (error) throw new Error(error.message);
   },
 };
