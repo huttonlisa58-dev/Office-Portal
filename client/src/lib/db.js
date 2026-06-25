@@ -294,7 +294,7 @@ export const leaves = {
     let q = supabase.from('leave_balances').select('*').eq('year', year);
     if (employeeId) q = q.eq('employee_id', employeeId);
     const { data } = await q.maybeSingle();
-    return data ? { balances: { CASUAL: data.casual, SICK: data.sick, EARNED: data.earned } } : null;
+    return data ? { balances: { CASUAL: data.casual, SICK: data.sick, EARNED: data.earned, COMPOFF: data.compoff || 0 } } : null;
   },
   async apply({ company_id, employee_id, type, from, to, reason }) {
     const days = Math.floor((new Date(to).setHours(0, 0, 0, 0) - new Date(from).setHours(0, 0, 0, 0)) / 86400000) + 1;
@@ -690,7 +690,7 @@ export const compoff = {
     return (data || []).map((c) => ({ _id: c.id, workedDate: c.worked_date, days: c.days, reason: c.reason, status: c.status, employeeId: c.employee_id, employee: c.employee ? { name: `${c.employee.first_name} ${c.employee.last_name || ''}`.trim(), code: c.employee.employee_code } : null }));
   },
   async create(p) { const { error } = await supabase.from('comp_off_requests').insert(p); if (error) throw new Error(error.message); },
-  async decide(id, status) { const { error } = await supabase.from('comp_off_requests').update({ status }).eq('id', id); if (error) throw new Error(error.message); },
+  async decide(id, status, note) { const { error } = await supabase.rpc('decide_comp_off', { p_id: id, p_decision: status, p_note: note || null }); if (error) throw new Error(error.message); },
 };
 
 // ---------- twilio phone verification ----------

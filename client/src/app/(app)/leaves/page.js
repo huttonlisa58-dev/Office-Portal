@@ -108,7 +108,7 @@ export default function LeavesPage() {
           <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {CARDS.map((cd) => {
               const quota = quotas[cd.key] ?? cd.quota;
-              const available = cd.key === 'COMPOFF' ? 0 : (balances[cd.key] ?? 0);
+              const available = cd.key === 'COMPOFF' ? (balances.COMPOFF ?? 0) : (balances[cd.key] ?? 0);
               const consumed = Math.max(quota - available, 0);
               return (
                 <div key={cd.key} className="card p-5">

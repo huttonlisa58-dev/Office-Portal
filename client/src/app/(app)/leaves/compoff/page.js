@@ -5,7 +5,7 @@ import PageBanner from '@/components/PageBanner';
 import Loader from '@/components/Loader';
 import Modal from '@/components/Modal';
 import { useAuth } from '@/context/AuthContext';
-import { compoff as api } from '@/lib/db';
+import { compoff as api, leaves as leaveApi } from '@/lib/db';
 
 const tone = (s) => ({ PENDING: 'bg-amber-50 text-amber-700', APPROVED: 'bg-emerald-50 text-emerald-700', REJECTED: 'bg-rose-50 text-rose-700' }[s] || 'bg-slate-100 text-slate-500');
 const fmt = (d) => new Date(d).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
@@ -15,20 +15,27 @@ export default function CompOffPage() {
   const canDecide = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR', 'MANAGER'].includes(user?.role);
   const hasEmployee = Boolean(user?.employee);
   const [items, setItems] = useState([]);
+  const [bal, setBal] = useState(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setItems(await api.list()); } catch { /* ignore */ } finally { setLoading(false); }
-  }, []);
+    try {
+      setItems(await api.list());
+      if (user?.employee) { const b = await leaveApi.balance(user.employee).catch(() => null); setBal(b?.balances?.COMPOFF ?? null); }
+    } catch { /* ignore */ } finally { setLoading(false); }
+  }, [user]);
   useEffect(() => { load(); }, [load]);
   const decide = async (id, status) => { try { await api.decide(id, status); load(); } catch (e) { alert(e.message); } };
 
   return (
     <>
       <PageBanner icon={FileText} title="Comp off request">
-        {hasEmployee && <button className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-sky-600 hover:bg-sky-50" onClick={() => setOpen(true)}><Plus size={15} className="mr-1 inline" />Request comp-off</button>}
+        <div className="flex items-center gap-3">
+          {hasEmployee && bal != null && <span className="rounded-xl bg-white/15 px-3 py-2 text-sm font-semibold text-white">Available: {bal} day(s)</span>}
+          {hasEmployee && <button className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-sky-600 hover:bg-sky-50" onClick={() => setOpen(true)}><Plus size={15} className="mr-1 inline" />Request comp-off</button>}
+        </div>
       </PageBanner>
 
       {loading ? <Loader /> : (
