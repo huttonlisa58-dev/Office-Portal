@@ -12,6 +12,7 @@ import { employees as empApi, org } from '@/lib/db';
 
 const AVA = ['bg-orange-500', 'bg-sky-500', 'bg-violet-500', 'bg-emerald-500', 'bg-rose-500', 'bg-amber-500'];
 const col = (s = '') => AVA[(s.charCodeAt(0) || 0) % AVA.length];
+const ROLE_LABEL = { SUPER_ADMIN: 'Super admin', COMPANY_ADMIN: 'Company admin', HR: 'HR', MANAGER: 'Manager', EMPLOYEE: 'Employee' };
 
 const GENDERS = ['Male', 'Female', 'Other'];
 const BLOODS = ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'];
@@ -86,7 +87,7 @@ function EmployeeList({ canManage, user }) {
                     <td className="px-5 py-3 text-slate-500">{e.location || '—'}</td>
                     <td className="px-5 py-3 text-slate-500">{e.designation?.title || '—'}</td>
                     <td className="px-5 py-3 text-slate-500">{e.department?.name || '—'}</td>
-                    <td className="px-5 py-3 text-slate-500">Employee</td>
+                    <td className="px-5 py-3 text-slate-500">{ROLE_LABEL[e.role] || 'Employee'}</td>
                     <td className="px-5 py-3 text-slate-500">{e.employmentType || 'Permanent'}</td>
                     <td className="px-5 py-3"><span className="badge bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">{e.status === 'ACTIVE' ? 'Active' : e.status}</span></td>
                     {canManage && <td className="px-5 py-3"><button className="btn-ghost p-1.5" onClick={(ev) => { ev.stopPropagation(); setEditing(e); }} title="Edit employee"><Pencil size={15} /></button></td>}

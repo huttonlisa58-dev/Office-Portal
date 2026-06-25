@@ -8,6 +8,7 @@ const mEmp = (r) => r && ({
   departmentId: r.department_id || null, designationId: r.designation_id || null,
   department: r.department ? { name: r.department.name } : null,
   designation: r.designation ? { title: r.designation.title } : null,
+  role: Array.isArray(r.account) ? (r.account[0]?.role || null) : (r.account?.role || null),
 });
 const mEmpRef = (r) => r && ({ _id: r.id, firstName: r.first_name, lastName: r.last_name, employeeId: r.employee_code });
 const mLeave = (r) => ({ _id: r.id, type: r.leave_type, from: r.from_date, to: r.to_date, days: r.days, reason: r.reason, status: r.status, appliedOn: r.created_at, decisionNote: r.decision_note, decidedAt: r.decided_at || null, decidedBy: r.decider ? `${r.decider.first_name} ${r.decider.last_name}`.trim() : null, employee: r.employee ? { ...mEmpRef(r.employee), location: r.employee.location || null, designation: r.employee.designation?.title || null } : null });
@@ -110,7 +111,7 @@ export async function getDashboard(profile, company) {
 export const employees = {
   async list({ q = '', page = 1, limit = 10 } = {}) {
     let query = supabase.from('employees')
-      .select('*, department:departments(name), designation:designations(title)', { count: 'exact' })
+      .select('*, department:departments(name), designation:designations(title), account:profiles!fk_profiles_employee(role)', { count: 'exact' })
       .order('created_at', { ascending: false });
     if (q) query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,employee_code.ilike.%${q}%,email.ilike.%${q}%`);
     const from = (page - 1) * limit;
