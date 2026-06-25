@@ -19,14 +19,18 @@ export default function ExpensesPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('ALL');
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setItems(await api.list()); } catch { /* ignore */ } finally { setLoading(false); }
-  }, []);
+    try { setItems(await api.list({ role: user?.role, employeeId: user?.employee })); } catch { /* ignore */ } finally { setLoading(false); }
+  }, [user]);
   useEffect(() => { load(); }, [load]);
 
   const decide = async (id, status) => { try { await api.decide(id, status); load(); } catch (e) { alert(e.message); } };
+
+  const summary = items.reduce((a, x) => { a[x.status] = (a[x.status] || 0) + 1; if (x.status === 'APPROVED') a.approvedAmt += Number(x.amount || 0); if (x.status === 'PENDING') a.pendingAmt += Number(x.amount || 0); return a; }, { PENDING: 0, APPROVED: 0, REJECTED: 0, approvedAmt: 0, pendingAmt: 0 });
+  const shown = filter === 'ALL' ? items : items.filter((x) => x.status === filter);
 
   return (
     <>
@@ -35,7 +39,21 @@ export default function ExpensesPage() {
       </PageBanner>
 
       {loading ? <Loader /> : (
-        <div className="card overflow-hidden">
+        <>
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="card p-4"><div className="text-xs text-slate-400">Pending</div><div className="mt-1 text-xl font-semibold text-amber-600">{summary.PENDING}</div><div className="text-[11px] text-slate-400">{money(summary.pendingAmt, 'INR')}</div></div>
+            <div className="card p-4"><div className="text-xs text-slate-400">Approved</div><div className="mt-1 text-xl font-semibold text-emerald-600">{summary.APPROVED}</div><div className="text-[11px] text-slate-400">{money(summary.approvedAmt, 'INR')}</div></div>
+            <div className="card p-4"><div className="text-xs text-slate-400">Rejected</div><div className="mt-1 text-xl font-semibold text-rose-600">{summary.REJECTED}</div></div>
+            <div className="card p-4"><div className="text-xs text-slate-400">Total claims</div><div className="mt-1 text-xl font-semibold">{items.length}</div></div>
+          </div>
+
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map((f) => (
+              <button key={f} onClick={() => setFilter(f)} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${filter === f ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}>{f[0] + f.slice(1).toLowerCase()}</button>
+            ))}
+          </div>
+
+          <div className="card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="border-b text-left text-slate-400">
@@ -43,8 +61,8 @@ export default function ExpensesPage() {
                 {canDecide && <th className="px-5 py-3 font-medium text-right">Action</th>}
               </tr></thead>
               <tbody>
-                {items.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400">No expenses submitted.</td></tr>}
-                {items.map((x) => (
+                {shown.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400">No expenses{filter !== 'ALL' ? ` (${filter.toLowerCase()})` : ' submitted'}.</td></tr>}
+                {shown.map((x) => (
                   <tr key={x._id} className="border-b last:border-0">
                     <td className="px-5 py-3 font-medium">{fmt(x.date)}</td>
                     <td className="px-5 py-3 text-slate-500">{x.employee?.name || '—'}</td>
@@ -63,7 +81,8 @@ export default function ExpensesPage() {
               </tbody>
             </table>
           </div>
-        </div>
+          </div>
+        </>
       )}
 
       {open && <ExpenseModal companyId={user?.company} employeeId={user?.employee} onClose={() => setOpen(false)} onDone={load} />}

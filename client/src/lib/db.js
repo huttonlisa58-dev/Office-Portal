@@ -665,12 +665,31 @@ export const assets = {
 
 // ---------- expenses ----------
 export const expenses = {
-  async list() {
-    const { data } = await supabase.from('expenses').select('*, employee:employees(first_name,last_name,employee_code)').order('expense_date', { ascending: false });
-    return (data || []).map((x) => ({ _id: x.id, category: x.category, amount: x.amount, currency: x.currency, date: x.expense_date, description: x.description, status: x.status, employeeId: x.employee_id, employee: x.employee ? { name: `${x.employee.first_name} ${x.employee.last_name || ''}`.trim(), code: x.employee.employee_code } : null }));
+  async list(viewer = {}) {
+    const sel = '*, employee:employees(first_name,last_name,employee_code)';
+    const map = (x) => ({ _id: x.id, category: x.category, amount: x.amount, currency: x.currency, date: x.expense_date, description: x.description, status: x.status, decidedAt: x.decided_at, decisionNote: x.decision_note, employeeId: x.employee_id, employee: x.employee ? { name: `${x.employee.first_name} ${x.employee.last_name || ''}`.trim(), code: x.employee.employee_code } : null });
+    const role = viewer.role;
+    const seesAll = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR'].includes(role);
+    if (seesAll) {
+      const { data } = await supabase.from('expenses').select(sel).order('expense_date', { ascending: false });
+      return (data || []).map(map);
+    }
+    if (role === 'MANAGER' && viewer.employeeId) {
+      const { data: emps } = await supabase.from('employees').select('id,manager_id');
+      const childrenBy = {}; (emps || []).forEach((e) => { if (e.manager_id) (childrenBy[e.manager_id] = childrenBy[e.manager_id] || []).push(e.id); });
+      const set = new Set([viewer.employeeId]); const stack = [viewer.employeeId];
+      while (stack.length) { const c = stack.pop(); (childrenBy[c] || []).forEach((id) => { if (!set.has(id)) { set.add(id); stack.push(id); } }); }
+      const { data } = await supabase.from('expenses').select(sel).order('expense_date', { ascending: false });
+      return (data || []).filter((x) => set.has(x.employee_id)).map(map);
+    }
+    if (viewer.employeeId) {
+      const { data } = await supabase.from('expenses').select(sel).eq('employee_id', viewer.employeeId).order('expense_date', { ascending: false });
+      return (data || []).map(map);
+    }
+    return [];
   },
   async create(p) { const { error } = await supabase.from('expenses').insert(p); if (error) throw new Error(error.message); },
-  async decide(id, status) { const { error } = await supabase.from('expenses').update({ status }).eq('id', id); if (error) throw new Error(error.message); },
+  async decide(id, status, note) { const { error } = await supabase.rpc('decide_expense', { p_id: id, p_decision: status, p_note: note || null }); if (error) throw new Error(error.message); },
 };
 
 // ---------- timesheets ----------
