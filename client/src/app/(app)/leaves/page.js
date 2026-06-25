@@ -50,6 +50,7 @@ export default function LeavesPage() {
   const [balances, setBalances] = useState({});
   const [txns, setTxns] = useState([]);
   const [quotas, setQuotas] = useState({});
+  const [reasonReq, setReasonReq] = useState({});
   const [accruing, setAccruing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -66,8 +67,8 @@ export default function LeavesPage() {
       if (bal?.balances) setBalances(bal.balances);
       setTxns(tx || []);
       const lps = await leavePolicies.list().catch(() => []);
-      const qm = {}; (lps || []).forEach((p) => { qm[p.leaveType] = p.annualQuota; });
-      setQuotas(qm);
+      const qm = {}; const rr = {}; (lps || []).forEach((p) => { qm[p.leaveType] = p.annualQuota; rr[p.leaveType] = p.reasonRequiredDays; });
+      setQuotas(qm); setReasonReq(rr);
     } catch { /* ignore */ } finally { setLoading(false); }
   }, [hasEmployee, user]);
 
@@ -84,9 +85,15 @@ export default function LeavesPage() {
 
   const mine = hasEmployee ? items.filter((l) => l.employee && l.employee.employeeId === user?.employeeCode) : items;
 
+  const leaveDays = (from, to) => { if (!from || !to) return 0; const a = new Date(from + 'T00:00:00'); const b = new Date(to + 'T00:00:00'); return Math.max(0, Math.round((b - a) / 86400000) + 1); };
+  const reasonThreshold = reasonReq[form.type];
+  const reasonNeeded = reasonThreshold != null && reasonThreshold > 0 && leaveDays(form.from, form.to) >= reasonThreshold;
+
   const submit = async () => {
     setErr('');
     if (!form.from || !form.to) { setErr('Pick both dates'); return; }
+    if (form.to < form.from) { setErr('End date can\u2019t be before start date'); return; }
+    if (reasonNeeded && !form.reason.trim()) { setErr(`A reason is required for leave of ${reasonThreshold}+ day(s).`); return; }
     try {
       await leaveApi.apply({ company_id: user?.company, employee_id: user?.employee, type: form.type, from: form.from, to: form.to, reason: form.reason });
       setOpen(false); setForm({ type: 'CASUAL', from: '', to: '', reason: '' }); load();
@@ -189,7 +196,9 @@ export default function LeavesPage() {
             <div><label className="label">From</label><input type="date" className="input" value={form.from} onChange={(e) => setForm({ ...form, from: e.target.value })} /></div>
             <div><label className="label">To</label><input type="date" className="input" value={form.to} onChange={(e) => setForm({ ...form, to: e.target.value })} /></div>
           </div>
-          <div><label className="label">Reason</label><textarea className="input" rows={2} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></div>
+          <div><label className="label">Reason {reasonNeeded && <span className="text-rose-500">*</span>}</label><textarea className="input" rows={2} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder={reasonNeeded ? 'Required for this many days' : 'Optional'} />
+            {reasonThreshold != null && reasonThreshold > 0 && <p className="mt-1 text-xs text-slate-400">Reason required for {reasonThreshold}+ day(s){form.from && form.to ? ` · selected: ${leaveDays(form.from, form.to)} day(s)` : ''}.</p>}
+          </div>
           <div className="flex justify-end gap-2 pt-1">
             <button className="btn-outline" onClick={() => setOpen(false)}>Cancel</button>
             <button className="btn-primary" onClick={submit}>Submit</button>

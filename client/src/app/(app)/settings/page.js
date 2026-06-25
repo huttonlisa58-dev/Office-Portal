@@ -33,8 +33,8 @@ export default function SettingsPage() {
       const [d, g, sh, em, lps] = await Promise.all([org.departments(), org.designations(), shiftApi.listAll(), empApi.all().catch(() => []), lpApi.list().catch(() => [])]);
       setDepts(d); setDesigs(g); setShiftList(sh); setEmpList(em || []);
       const pm = {};
-      (lps || []).forEach((p) => { pm[p.leaveType] = { annualQuota: p.annualQuota, accrualPerMonth: p.accrualPerMonth, eligibilityMonths: p.eligibilityMonths, carryForwardCap: p.carryForwardCap ?? '' }; });
-      ['EARNED', 'SICK', 'CASUAL'].forEach((t) => { if (!pm[t]) pm[t] = { annualQuota: 0, accrualPerMonth: 0, eligibilityMonths: 0, carryForwardCap: '' }; });
+      (lps || []).forEach((p) => { pm[p.leaveType] = { annualQuota: p.annualQuota, accrualPerMonth: p.accrualPerMonth, eligibilityMonths: p.eligibilityMonths, carryForwardCap: p.carryForwardCap ?? '', reasonRequiredDays: p.reasonRequiredDays ?? '' }; });
+      ['EARNED', 'SICK', 'CASUAL'].forEach((t) => { if (!pm[t]) pm[t] = { annualQuota: 0, accrualPerMonth: 0, eligibilityMonths: 0, carryForwardCap: '', reasonRequiredDays: '' }; });
       setPol(pm);
     } catch { /* ignore */ } finally { setLoading(false); }
   }, []);
@@ -80,6 +80,7 @@ export default function SettingsPage() {
           accrualPerMonth: Number(row.accrualPerMonth) || 0,
           eligibilityMonths: Number(row.eligibilityMonths) || 0,
           carryForwardCap: row.carryForwardCap === '' || row.carryForwardCap == null ? null : Number(row.carryForwardCap),
+          reasonRequiredDays: row.reasonRequiredDays === '' || row.reasonRequiredDays == null ? null : Number(row.reasonRequiredDays),
         });
       }
       setPolMsg('Leave policies saved.');
@@ -201,7 +202,7 @@ export default function SettingsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="text-left text-slate-400">
-                <th className="py-2 pr-4 font-medium">Leave type</th><th className="py-2 pr-4 font-medium">Annual quota</th><th className="py-2 pr-4 font-medium">Accrual / month</th><th className="py-2 pr-4 font-medium">Eligibility (months)</th><th className="py-2 pr-4 font-medium">Carry-forward cap</th>
+                <th className="py-2 pr-4 font-medium">Leave type</th><th className="py-2 pr-4 font-medium">Annual quota</th><th className="py-2 pr-4 font-medium">Accrual / month</th><th className="py-2 pr-4 font-medium">Eligibility (months)</th><th className="py-2 pr-4 font-medium">Carry-forward cap</th><th className="py-2 pr-4 font-medium">Reason required (≥ days)</th>
               </tr></thead>
               <tbody>
                 {[['EARNED', 'Earned Leave'], ['SICK', 'Sick Leave'], ['CASUAL', 'Casual Leave']].map(([t, label]) => (
@@ -211,6 +212,7 @@ export default function SettingsPage() {
                     <td className="py-2 pr-4"><input type="number" step="0.5" min="0" className="input w-24" value={pol[t]?.accrualPerMonth ?? ''} onChange={setPolField(t, 'accrualPerMonth')} /></td>
                     <td className="py-2 pr-4"><input type="number" step="1" min="0" className="input w-24" value={pol[t]?.eligibilityMonths ?? ''} onChange={setPolField(t, 'eligibilityMonths')} /></td>
                     <td className="py-2 pr-4"><input type="number" step="0.5" min="0" placeholder="none" className="input w-24" value={pol[t]?.carryForwardCap ?? ''} onChange={setPolField(t, 'carryForwardCap')} /></td>
+                    <td className="py-2 pr-4"><input type="number" step="1" min="0" placeholder="off" className="input w-24" value={pol[t]?.reasonRequiredDays ?? ''} onChange={setPolField(t, 'reasonRequiredDays')} /></td>
                   </tr>
                 ))}
               </tbody>
