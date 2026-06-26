@@ -13,7 +13,7 @@ const mEmp = (r) => r && ({
 const mEmpRef = (r) => r && ({ _id: r.id, firstName: r.first_name, lastName: r.last_name, employeeId: r.employee_code });
 const mLeave = (r) => ({ _id: r.id, type: r.leave_type, from: r.from_date, to: r.to_date, days: r.days, reason: r.reason, status: r.status, appliedOn: r.created_at, decisionNote: r.decision_note, decidedAt: r.decided_at || null, decidedBy: r.decider ? `${r.decider.first_name} ${r.decider.last_name}`.trim() : null, employee: r.employee ? { ...mEmpRef(r.employee), location: r.employee.location || null, designation: r.employee.designation?.title || null } : null });
 const mAtt = (r) => ({ _id: r.id, date: r.work_date, status: r.status, isLate: r.is_late, workedMinutes: r.worked_minutes, overtimeMinutes: r.overtime_minutes, checkIn: r.check_in_at ? { time: r.check_in_at, method: r.check_in_method } : null, checkOut: r.check_out_at ? { time: r.check_out_at } : null, employee: mEmpRef(r.employee) });
-const mPay = (r) => ({ _id: r.id, month: r.month, year: r.year, currency: r.currency, basic: r.basic, gross: r.gross, tax: r.tax, tds: r.tds, bonus: r.bonus, lopDays: r.lop_days, allowances: r.allowances || [], deductions: r.deductions || [], netPay: r.net_pay, status: r.status, employee: mEmpRef(r.employee) });
+const mPay = (r) => ({ _id: r.id, month: r.month, year: r.year, currency: r.currency, basic: r.basic, gross: r.gross, tax: r.tax, tds: r.tds, bonus: r.bonus, lopDays: r.lop_days, allowances: r.allowances || [], deductions: r.deductions || [], netPay: r.net_pay, status: r.status, isWithheld: r.is_withheld || false, employee: mEmpRef(r.employee) });
 const mCompany = (r) => ({ _id: r.id, name: r.name, slug: r.slug, isActive: r.is_active, createdAt: r.created_at, subscription: { plan: r.plan } });
 
 async function invoke(name, body) {
@@ -383,6 +383,7 @@ export const payroll = {
     return data; // pay_run id
   },
   markPaid: async (id) => { const { error } = await supabase.from('payrolls').update({ status: 'PAID' }).eq('id', id); if (error) throw new Error(error.message); },
+  setWithheld: async (id, withheld) => { const { error } = await supabase.from('payrolls').update({ is_withheld: withheld }).eq('id', id); if (error) throw new Error(error.message); },
 };
 
 // ---------- salary revisions (CTC change log) ----------

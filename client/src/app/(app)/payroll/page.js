@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Wallet, Plus, Download, BadgeCheck, Settings2, Play } from 'lucide-react';
+import { Wallet, Plus, Download, BadgeCheck, Settings2, Play, Lock, LockOpen } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import Loader from '@/components/Loader';
 import Modal from '@/components/Modal';
@@ -71,10 +71,15 @@ export default function PayrollPage() {
     try { await payApi.markPaid(p._id); load(); }
     catch (e) { alert(e.message || 'Action failed'); }
   };
+  const toggleHold = async (p, withheld) => {
+    try { await payApi.setWithheld(p._id, withheld); load(); }
+    catch (e) { alert(e.message || 'Action failed'); }
+  };
 
   const needle = q.trim().toLowerCase();
   const shown = items.filter((p) => {
-    if (statusF !== 'ALL' && p.status !== statusF) return false;
+    if (statusF === 'HELD') { if (!p.isWithheld) return false; }
+    else if (statusF !== 'ALL' && p.status !== statusF) return false;
     if (!needle) return true;
     const name = `${p.employee?.firstName || ''} ${p.employee?.lastName || ''}`.toLowerCase();
     const code = (p.employee?.employeeId || '').toLowerCase();
@@ -100,7 +105,7 @@ export default function PayrollPage() {
           <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3 dark:border-slate-700">
             <input className="input h-9 w-full max-w-xs py-1" placeholder="Search employee name or ID…" value={q} onChange={(e) => setQ(e.target.value)} />
             <div className="flex flex-wrap gap-1.5">
-              {['ALL', 'GENERATED', 'PAID'].map((f) => (
+              {['ALL', 'GENERATED', 'PAID', 'HELD'].map((f) => (
                 <button key={f} onClick={() => setStatusF(f)} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${statusF === f ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}>{f === 'ALL' ? 'All' : f[0] + f.slice(1).toLowerCase()}</button>
               ))}
             </div>
@@ -123,11 +128,14 @@ export default function PayrollPage() {
                     <td className="px-5 py-3">{money(p.gross, p.currency)}</td>
                     <td className="px-5 py-3 text-slate-500">{money(p.tax, p.currency)}</td>
                     <td className="px-5 py-3 font-semibold">{money(p.netPay, p.currency)}</td>
-                    <td className="px-5 py-3"><StatusBadge status={p.status} /></td>
+                    <td className="px-5 py-3"><div className="flex items-center gap-1.5"><StatusBadge status={p.status} />{p.isWithheld && <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950/50 dark:text-amber-300">HELD</span>}</div></td>
                     <td className="px-5 py-3">
                       <div className="flex justify-end gap-1">
                         <button className="btn-ghost p-1.5" title="Download payslip" onClick={() => download(p)}><Download size={16} /></button>
-                        {canManage && p.status !== 'PAID' && <button className="btn-ghost p-1.5 text-emerald-600" title="Mark paid" onClick={() => markPaid(p)}><BadgeCheck size={16} /></button>}
+                        {canManage && (p.isWithheld
+                          ? <button className="btn-ghost p-1.5 text-sky-600" title="Release withheld" onClick={() => toggleHold(p, false)}><LockOpen size={16} /></button>
+                          : p.status !== 'PAID' && <button className="btn-ghost p-1.5 text-amber-600" title="Withhold (full & final)" onClick={() => toggleHold(p, true)}><Lock size={16} /></button>)}
+                        {canManage && p.status !== 'PAID' && !p.isWithheld && <button className="btn-ghost p-1.5 text-emerald-600" title="Mark paid" onClick={() => markPaid(p)}><BadgeCheck size={16} /></button>}
                       </div>
                     </td>
                   </tr>
