@@ -709,12 +709,22 @@ export const notifications = {
 export const holidays = {
   async all() {
     const { data } = await supabase.from('holidays').select('*').order('date');
-    return (data || []).map((h) => ({ _id: h.id, name: h.name, date: h.date }));
+    return (data || []).map((h) => ({ _id: h.id, name: h.name, date: h.date, isOptional: !!h.is_optional }));
   },
   async upcoming(limit = 6) {
     const today = new Date().toISOString().slice(0, 10);
     const { data } = await supabase.from('holidays').select('*').gte('date', today).order('date').limit(limit);
     return (data || []).map((h) => ({ _id: h.id, name: h.name, date: h.date }));
+  },
+  async save({ id = null, name, date, isOptional = false }) {
+    const { data, error } = await supabase.rpc('upsert_holiday', { p_id: id, p_name: name, p_date: date, p_is_optional: isOptional });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+  async remove(id) { const { error } = await supabase.rpc('delete_holiday', { p_id: id }); if (error) throw new Error(error.message); },
+  async lockedPeriods() {
+    const { data } = await supabase.from('pay_runs').select('period,status').eq('status', 'COMPLETED');
+    return new Set((data || []).map((r) => r.period));
   },
 };
 
