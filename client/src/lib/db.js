@@ -740,6 +740,31 @@ export const profileDetails = {
   remove: async (table, id) => { const { error } = await supabase.rpc('delete_profile_record', { p_table: table, p_id: id }); if (error) throw new Error(error.message); },
 };
 
+export const productivity = {
+  // HR/admin-only (enforced by RLS). Aggregate, transparent app-usage analytics — no screenshots/covert capture.
+  async appUsage(start, end) {
+    const { data } = await supabase.from('app_usage')
+      .select('employee_id, app_name, category, duration_seconds, usage_date, employee:employees(first_name,last_name,employee_code)')
+      .gte('usage_date', start).lte('usage_date', end);
+    const byEmp = {};
+    (data || []).forEach((r) => {
+      const k = r.employee_id;
+      const e = (byEmp[k] ||= { employeeId: k, employee: mEmpRef(r.employee), total: 0, byCategory: {}, byApp: {} });
+      const s = Number(r.duration_seconds || 0);
+      e.total += s;
+      const cat = r.category || 'Uncategorized';
+      e.byCategory[cat] = (e.byCategory[cat] || 0) + s;
+      const app = r.app_name || 'Unknown';
+      e.byApp[app] = (e.byApp[app] || 0) + s;
+    });
+    return Object.values(byEmp).map((e) => ({
+      ...e,
+      categories: Object.entries(e.byCategory).map(([name, seconds]) => ({ name, seconds })).sort((a, b) => b.seconds - a.seconds),
+      topApps: Object.entries(e.byApp).map(([name, seconds]) => ({ name, seconds })).sort((a, b) => b.seconds - a.seconds).slice(0, 5),
+    })).sort((a, b) => b.total - a.total);
+  },
+};
+
 // ---------- companies (super admin) ----------
 export const companies = {
   async list() {

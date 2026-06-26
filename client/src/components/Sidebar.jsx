@@ -56,6 +56,7 @@ const NAV = [
     { href: '/assets', label: 'Assets' },
   ] },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
+  { href: '/productivity', label: 'Productivity', icon: Activity, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR'] },
   { href: '/assistant', label: 'AI Assistant', icon: Bot },
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR'] },
   { href: '/help', label: 'Help', icon: HelpCircle },
