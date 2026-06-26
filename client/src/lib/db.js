@@ -471,6 +471,31 @@ export const companies = {
   },
 };
 
+// ---------- loans & advances ----------
+export const loans = {
+  async list() {
+    const { data } = await supabase.from('loans')
+      .select('*, employee:employees(first_name,last_name,employee_code)')
+      .order('created_at', { ascending: false });
+    return (data || []).map((l) => ({
+      _id: l.id, type: l.type, principal: Number(l.principal || 0), outstanding: Number(l.outstanding || 0),
+      emi: Number(l.emi || 0), currency: l.currency || 'INR', status: l.status, startDate: l.start_date,
+      remarks: l.remarks, employeeId: l.employee_id, employee: mEmpRef(l.employee),
+    }));
+  },
+  async create({ companyId, employeeId, type, principal, emi, startDate, remarks }) {
+    if (!employeeId || !principal) throw new Error('Employee and principal are required');
+    const { error } = await supabase.from('loans').insert({
+      company_id: companyId, employee_id: employeeId, type: type || 'LOAN',
+      principal: Number(principal), outstanding: Number(principal), emi: Number(emi || 0),
+      currency: 'INR', status: 'ACTIVE', start_date: startDate || new Date().toISOString().slice(0, 10), remarks: remarks || null,
+    });
+    if (error) throw new Error(error.message);
+  },
+  async update(id, patch) { const { error } = await supabase.from('loans').update(patch).eq('id', id); if (error) throw new Error(error.message); },
+  async close(id) { const { error } = await supabase.from('loans').update({ status: 'CLOSED', outstanding: 0 }).eq('id', id); if (error) throw new Error(error.message); },
+};
+
 // ---------- notifications ----------
 export const notifications = {
   async list() {
