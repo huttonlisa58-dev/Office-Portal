@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { BarChart3, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, LogIn, LogOut, ArrowLeft, Plane, Download, Users } from 'lucide-react';
+import { BarChart3, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, LogIn, LogOut, ArrowLeft, Plane, Download, Users, Turtle } from 'lucide-react';
 import PageBanner from '@/components/PageBanner';
 import Loader from '@/components/Loader';
 import { useAuth } from '@/context/AuthContext';
@@ -192,25 +192,25 @@ function EmployeeAttendanceReport({ viewer }) {
     const leave = new Map(); data.leaves.forEach((l) => eachDateStr(l.from_date > data.start ? l.from_date : data.start, l.to_date < data.end ? l.to_date : data.end, (d) => leave.set(`${l.employee_id}|${d}`, l.leave_type)));
     const hol = new Set(data.holidays.map((h) => h.date));
     return data.employees.map((emp) => {
-      let present = 0, leaveDays = 0, holiday = 0, weekoff = 0, absent = 0, workedOff = 0;
+      let present = 0, leaveDays = 0, holiday = 0, weekoff = 0, absent = 0, workedOff = 0, late = 0;
       eachDateStr(data.start, data.end, (date, dow) => {
         const weekend = dow === 0 || dow === 6;
         const st = att.get(`${emp.id}|${date}`); const lv = leave.get(`${emp.id}|${date}`);
         const isHol = hol.has(date);
         const worked = st === 'PRESENT' || st === 'LATE' || st === 'HALF_DAY';
-        if (worked) { present++; if (isHol || weekend) workedOff++; }
+        if (worked) { present++; if (st === 'LATE') late++; if (isHol || weekend) workedOff++; }
         else if (isHol) holiday++;
         else if (lv) leaveDays++;
         else if (weekend) weekoff++;
         else if (date < todayStr) absent++; // past working day with no record
       });
-      return { id: emp.id, name: emp.name, code: emp.code, present, absent, leaveDays, holiday, weekoff, workedOff };
+      return { id: emp.id, name: emp.name, code: emp.code, present, absent, leaveDays, holiday, weekoff, workedOff, late };
     });
   }, [data, todayStr]);
 
   const exportCSV = () => {
-    const header = ['Employee', 'Code', 'Present', 'Absent', 'Leave', 'Holiday', 'Week-off', 'Worked on off-day'];
-    const rows = [header, ...summary.map((s) => [s.name, s.code, s.present, s.absent, s.leaveDays, s.holiday, s.weekoff, s.workedOff])];
+    const header = ['Employee', 'Code', 'Present', 'Late', 'Absent', 'Leave', 'Holiday', 'Week-off', 'Worked on off-day'];
+    const rows = [header, ...summary.map((s) => [s.name, s.code, s.present, s.late, s.absent, s.leaveDays, s.holiday, s.weekoff, s.workedOff])];
     downloadCSV(`attendance_${start}_to_${end}.csv`, rows);
   };
 
@@ -231,13 +231,14 @@ function EmployeeAttendanceReport({ viewer }) {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700">
-                <th className="px-3 py-2.5">Employee</th><th className="px-3 py-2.5">Present</th><th className="px-3 py-2.5">Absent</th><th className="px-3 py-2.5">Leave</th><th className="px-3 py-2.5">Holiday</th><th className="px-3 py-2.5">Week-off</th><th className="px-3 py-2.5">On off-day</th>
+                <th className="px-3 py-2.5">Employee</th><th className="px-3 py-2.5">Present</th><th className="px-3 py-2.5"><span className="inline-flex items-center gap-1"><Turtle size={13} className="text-rose-500" />Late</span></th><th className="px-3 py-2.5">Absent</th><th className="px-3 py-2.5">Leave</th><th className="px-3 py-2.5">Holiday</th><th className="px-3 py-2.5">Week-off</th><th className="px-3 py-2.5">On off-day</th>
               </tr></thead>
               <tbody>
                 {summary.map((s) => (
                   <tr key={s.id} className="border-b dark:border-slate-700">
                     <td className="px-3 py-2.5"><div className="font-medium">{s.name}</div><div className="text-[10px] text-slate-400">{s.code}</div></td>
                     <td className="px-3 py-2.5 font-semibold text-emerald-600">{s.present}</td>
+                    <td className="px-3 py-2.5 text-rose-500">{s.late > 0 ? <span className="inline-flex items-center gap-1"><Turtle size={13} />{s.late}</span> : <span className="text-slate-300">0</span>}</td>
                     <td className="px-3 py-2.5 text-rose-600">{s.absent}</td>
                     <td className="px-3 py-2.5 text-violet-600">{s.leaveDays}</td>
                     <td className="px-3 py-2.5 text-sky-600">{s.holiday}</td>

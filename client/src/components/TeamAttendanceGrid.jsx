@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, CalendarRange } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarRange, Turtle } from 'lucide-react';
 import { attendance as attApi } from '@/lib/db';
 import { useAuth } from '@/context/AuthContext';
 import Loader from '@/components/Loader';
@@ -64,9 +64,10 @@ export default function TeamAttendanceGrid() {
         const lv = leave.get(`${emp.id}|${date}`);
         const isHol = holidayName.has(date);
         const worked = st === 'PRESENT' || st === 'LATE' || st === 'HALF_DAY';
-        let code = '', title = '', workedOnOff = false;
+        let code = '', title = '', workedOnOff = false, late = false;
         if (worked) {
           code = st === 'PRESENT' ? 'P' : st === 'LATE' ? 'L' : 'HD';
+          if (st === 'LATE') { late = true; title = 'Late entry'; }
           if (isHol) { workedOnOff = true; title = `Worked on holiday: ${holidayName.get(date) || 'Holiday'}`; }
           else if (weekend) { workedOnOff = true; title = 'Worked on week-off'; }
         } else if (isHol) { code = 'H'; title = holidayName.get(date) || 'Holiday'; }
@@ -74,7 +75,7 @@ export default function TeamAttendanceGrid() {
         else if (weekend) { code = 'WO'; title = 'Week off'; }
         else if (date < todayStr) { code = 'A'; title = 'Absent'; }
         else { code = ''; }
-        cells.push({ date, code, title, workedOnOff, weekend });
+        cells.push({ date, code, title, workedOnOff, weekend, late });
       }
       const present = cells.filter((c) => c.code === 'P' || c.code === 'L' || c.code === 'HD').length;
       return { emp, cells, present };
@@ -109,6 +110,7 @@ export default function TeamAttendanceGrid() {
         <span className="inline-flex items-center gap-1.5">
           <span className="grid h-4 w-4 place-items-center rounded text-[9px] font-bold outline outline-2 outline-amber-500 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">P</span>Worked on off-day/holiday
         </span>
+        <span className="inline-flex items-center gap-1.5"><Turtle size={14} className="text-rose-500" /> Late entry</span>
       </div>
 
       {loading ? <Loader /> : !matrix ? (
@@ -142,7 +144,10 @@ export default function TeamAttendanceGrid() {
                   </td>
                   {cells.map((c, i) => (
                     <td key={i} className="border-b border-l p-0.5 text-center" style={{ minWidth: 30 }}>
-                      <div title={c.title} className={`mx-auto grid h-6 w-7 place-items-center rounded text-[9px] font-bold ${CELL[c.code] || ''} ${c.workedOnOff ? 'outline outline-2 outline-amber-500' : ''}`}>{c.code}</div>
+                      <div title={c.title} className={`relative mx-auto grid h-6 w-7 place-items-center rounded text-[9px] font-bold ${CELL[c.code] || ''} ${c.workedOnOff ? 'outline outline-2 outline-amber-500' : ''}`}>
+                        {c.code}
+                        {c.late && <Turtle size={9} className="absolute -right-0.5 -top-0.5 text-rose-500" />}
+                      </div>
                     </td>
                   ))}
                   <td className="border-b border-l px-3 text-center font-semibold text-emerald-600">{present}</td>
