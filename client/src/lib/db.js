@@ -611,6 +611,46 @@ export const projects = {
   remove: async (id) => { const { error } = await supabase.from('projects').delete().eq('id', id); if (error) throw new Error(error.message); },
 };
 
+export const feed = {
+  async list(currentUserId) {
+    const [{ data: posts }, { data: comments }, { data: reactions }] = await Promise.all([
+      supabase.from('feed_posts').select('*, author:profiles(full_name)').order('created_at', { ascending: false }),
+      supabase.from('post_comments').select('*, author:profiles(full_name)').order('created_at', { ascending: true }),
+      supabase.from('post_reactions').select('*'),
+    ]);
+    const commentsByPost = {};
+    (comments || []).forEach((c) => { (commentsByPost[c.post_id] = commentsByPost[c.post_id] || []).push({ _id: c.id, body: c.body, authorName: c.author?.full_name || 'Someone', authorId: c.author_id, createdAt: c.created_at }); });
+    const rxByPost = {};
+    (reactions || []).forEach((r) => { (rxByPost[r.post_id] = rxByPost[r.post_id] || []).push(r); });
+    return (posts || []).map((p) => {
+      const rx = rxByPost[p.id] || [];
+      const byEmoji = {};
+      rx.forEach((r) => { byEmoji[r.emoji] = byEmoji[r.emoji] || { emoji: r.emoji, count: 0, mine: false }; byEmoji[r.emoji].count += 1; if (r.author_id === currentUserId) byEmoji[r.emoji].mine = true; });
+      return {
+        _id: p.id, body: p.body, imageUrl: p.image_url || null,
+        authorName: p.author?.full_name || 'Someone', authorId: p.author_id, createdAt: p.created_at,
+        comments: commentsByPost[p.id] || [],
+        reactions: Object.values(byEmoji).sort((a, b) => b.count - a.count),
+      };
+    });
+  },
+  createPost: async ({ company_id, author_id, body, imageUrl }) => {
+    const { error } = await supabase.from('feed_posts').insert({ company_id, author_id, body, image_url: imageUrl || null });
+    if (error) throw new Error(error.message);
+  },
+  deletePost: async (id) => { const { error } = await supabase.from('feed_posts').delete().eq('id', id); if (error) throw new Error(error.message); },
+  addComment: async ({ company_id, post_id, author_id, body }) => {
+    const { error } = await supabase.from('post_comments').insert({ company_id, post_id, author_id, body });
+    if (error) throw new Error(error.message);
+  },
+  deleteComment: async (id) => { const { error } = await supabase.from('post_comments').delete().eq('id', id); if (error) throw new Error(error.message); },
+  toggleReaction: async ({ company_id, post_id, author_id, emoji }) => {
+    const { data: existing } = await supabase.from('post_reactions').select('id').eq('post_id', post_id).eq('author_id', author_id).eq('emoji', emoji).maybeSingle();
+    if (existing) { const { error } = await supabase.from('post_reactions').delete().eq('id', existing.id); if (error) throw new Error(error.message); }
+    else { const { error } = await supabase.from('post_reactions').insert({ company_id, post_id, author_id, emoji }); if (error) throw new Error(error.message); }
+  },
+};
+
 // ---------- companies (super admin) ----------
 export const companies = {
   async list() {
