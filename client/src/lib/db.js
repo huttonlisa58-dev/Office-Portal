@@ -41,7 +41,7 @@ export async function getMe() {
   }
   if (profile?.company_id) {
     const { data: c } = await supabase.from('companies').select('*').eq('id', profile.company_id).single();
-    company = c && { ...mCompany(c), logo: c.logo || null, timezone: c.timezone, workSettings: { workdayStart: c.workday_start, lateAfterMinutes: c.late_after_minutes, fullDayHours: c.full_day_hours } };
+    company = c && { ...mCompany(c), logo: c.logo || null, address: c.address || null, timezone: c.timezone, workSettings: { workdayStart: c.workday_start, lateAfterMinutes: c.late_after_minutes, fullDayHours: c.full_day_hours } };
   }
   return {
     user: { id: user.id, name: profile?.full_name, email: profile?.email, role: profile?.role, employee: profile?.employee_id, employeeCode, company: profile?.company_id },

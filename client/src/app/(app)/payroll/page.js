@@ -12,7 +12,7 @@ import { payroll as payApi, employees as empApi } from '@/lib/db';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export default function PayrollPage() {
-  const { user } = useAuth();
+  const { user, company } = useAuth();
   const canManage = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR'].includes(user?.role);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,16 +41,19 @@ export default function PayrollPage() {
     const totalEarn = earnings.reduce((s, x) => s + x.amount, 0);
     const totalDed = deductions.reduce((s, x) => s + x.amount, 0);
     const rows = (arr) => arr.map((x) => `<tr><td>${x.label}</td><td class="r">${fmt(x.amount)}</td></tr>`).join('');
+    const brand = `<div class="brand">${company?.logo ? `<img src="${company.logo}" alt="logo" class="logo"/>` : ''}<div><div class="cname">${company?.name || ''}</div>${company?.address ? `<div class="caddr">${company.address}</div>` : ''}</div></div>`;
     const html = `<!doctype html><html><head><meta charset="utf-8"><title>Payslip ${p.employee?.employeeId || ''} ${p.month}/${p.year}</title>
       <style>body{font-family:system-ui,Arial,sans-serif;color:#0f172a;max-width:720px;margin:32px auto;padding:0 16px}
       h1{font-size:20px;margin:0 0 4px}.muted{color:#64748b;font-size:13px}
+      .brand{display:flex;align-items:center;gap:12px;margin-bottom:14px}.logo{height:44px;width:auto;object-fit:contain}
+      .cname{font-size:17px;font-weight:700}.caddr{color:#64748b;font-size:12px;max-width:380px}
       table{width:100%;border-collapse:collapse;margin-top:18px;font-size:14px}
       td,th{padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:left}
       .r{text-align:right}.tot td{font-weight:700;border-top:2px solid #cbd5e1}
       .grid{display:flex;gap:24px;flex-wrap:wrap}.grid>div{flex:1;min-width:280px}
       .net{margin-top:20px;background:#f1f5f9;border-radius:12px;padding:14px 16px;display:flex;justify-content:space-between;font-size:17px;font-weight:700}
       .hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1f49f5;padding-bottom:12px}</style></head>
-      <body><div class="hd"><div><h1>Payslip</h1><div class="muted">${MONTHS[p.month - 1]} ${p.year}</div></div>
+      <body>${brand}<div class="hd"><div><h1>Payslip</h1><div class="muted">${MONTHS[p.month - 1]} ${p.year}</div></div>
       <div class="muted r">${name}<br/>${p.employee?.employeeId || ''}<br/>Status: ${p.status}</div></div>
       <div class="grid">
         <div><table><tr><th>Earnings</th><th class="r">Amount</th></tr>${rows(earnings)}<tr class="tot"><td>Gross</td><td class="r">${fmt(totalEarn)}</td></tr></table></div>
