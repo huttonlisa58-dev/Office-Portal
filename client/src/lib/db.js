@@ -651,6 +651,26 @@ export const feed = {
   },
 };
 
+export const announcements = {
+  async list() {
+    const { data } = await supabase.from('announcements').select('*, author:profiles(full_name)').order('published_at', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false });
+    return (data || []).map((a) => ({
+      _id: a.id, title: a.title, body: a.body, audience: a.audience || 'ALL', isActive: a.is_active !== false,
+      authorName: a.author?.full_name || null, publishedAt: a.published_at || a.created_at,
+    }));
+  },
+  create: async ({ company_id, published_by, title, body, audience }) => {
+    const { error } = await supabase.from('announcements').insert({ company_id, published_by, title, body, audience: audience || 'ALL', is_active: true, published_at: new Date().toISOString() });
+    if (error) throw new Error(error.message);
+  },
+  update: async (id, { title, body, audience }) => {
+    const { error } = await supabase.from('announcements').update({ title, body, audience }).eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+  setActive: async (id, active) => { const { error } = await supabase.from('announcements').update({ is_active: active }).eq('id', id); if (error) throw new Error(error.message); },
+  remove: async (id) => { const { error } = await supabase.from('announcements').delete().eq('id', id); if (error) throw new Error(error.message); },
+};
+
 // ---------- companies (super admin) ----------
 export const companies = {
   async list() {
