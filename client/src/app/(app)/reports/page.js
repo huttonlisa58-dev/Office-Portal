@@ -164,6 +164,67 @@ function Empty({ text }) { return <div className="grid place-items-center py-12 
 
 function sumAmt(arr) { return (arr || []).reduce((s, x) => s + Number(x.amount || 0), 0); }
 
+function hm(min) { const h = Math.floor(min / 60), m = Math.round(min % 60); return h ? `${h}h ${m}m` : `${m}m`; }
+
+function ActivityReport() {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [start, setStart] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); });
+  const [end, setEnd] = useState(todayStr);
+  const [rows, setRows] = useState(null);
+  useEffect(() => {
+    let a = true; setRows(null);
+    attApi.activitySummary(start, end).then((d) => { if (a) setRows(d); }).catch(() => { if (a) setRows([]); });
+    return () => { a = false; };
+  }, [start, end]);
+
+  const fmtDate = (d) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
+  const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+  const exportCSV = () => {
+    const header = ['Employee', 'Code', 'Date', 'First in', 'Last out', 'Sessions', 'Active (min)', 'Idle (min)'];
+    const body = (rows || []).map((r) => [`${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim(), r.employee?.employeeId || '', r.date, fmtTime(r.firstIn), fmtTime(r.lastOut), r.sessions, r.activeMin, r.idleMin]);
+    downloadCSV(`activity_idle_${start}_to_${end}.csv`, [header, ...body]);
+  };
+
+  return (
+    <div className="card p-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 dark:border-slate-700">
+        <h3 className="font-semibold">Activity &amp; idle time</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <input type="date" className="input h-9 w-auto py-1" value={start} max={end} onChange={(e) => setStart(e.target.value)} />
+          <span className="text-xs text-slate-400">to</span>
+          <input type="date" className="input h-9 w-auto py-1" value={end} min={start} max={todayStr} onChange={(e) => setEnd(e.target.value)} />
+          <button onClick={exportCSV} disabled={!rows?.length} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"><Download size={15} /> Export CSV</button>
+        </div>
+      </div>
+      <div className="p-3 sm:p-4">
+        <p className="mb-3 text-xs text-slate-400">Active = time between matched check-in/out pairs. Idle = gaps between sessions during the day (breaks). Derived from attendance punches.</p>
+        {rows === null ? <Loader /> : !rows.length ? <Empty text="No punch activity in range." /> : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700">
+                <th className="px-3 py-2.5">Employee</th><th className="px-3 py-2.5">Date</th><th className="px-3 py-2.5">First in</th><th className="px-3 py-2.5">Last out</th><th className="px-3 py-2.5">Sessions</th><th className="px-3 py-2.5">Active</th><th className="px-3 py-2.5">Idle</th>
+              </tr></thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className="border-b dark:border-slate-700">
+                    <td className="px-3 py-2.5"><div className="font-medium">{r.employee?.firstName} {r.employee?.lastName}</div><div className="text-[10px] text-slate-400">{r.employee?.employeeId}</div></td>
+                    <td className="px-3 py-2.5 text-slate-500">{fmtDate(r.date)}</td>
+                    <td className="px-3 py-2.5 tabular-nums">{fmtTime(r.firstIn)}</td>
+                    <td className="px-3 py-2.5 tabular-nums">{fmtTime(r.lastOut)}</td>
+                    <td className="px-3 py-2.5">{r.sessions}</td>
+                    <td className="px-3 py-2.5 font-medium text-emerald-600">{hm(r.activeMin)}</td>
+                    <td className="px-3 py-2.5 text-amber-600">{hm(r.idleMin)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Form16Report() {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
@@ -440,6 +501,7 @@ const CATEGORIES = [
     { key: 'entryexit', label: 'Entry / Exit' },
     { key: 'empattendance', label: 'Employee Attendance Report' },
     { key: 'manualentry', label: 'Manual time entries', managerOnly: true },
+    { key: 'activity', label: 'Activity & idle time', managerOnly: true },
   ] },
   { key: 'leave', label: 'Leave tracker reports', icon: Plane, reports: [
     { key: 'leavesummary', label: 'My leave summary' },
@@ -500,6 +562,7 @@ export default function ReportsPage() {
               {report === 'leavesummary' && <LeaveSummaryReport employeeId={employeeId} />}
               {report === 'ctc' && <CTCReport />}
               {report === 'manualentry' && <ManualEntryReport />}
+              {report === 'activity' && <ActivityReport />}
               {report === 'form16' && <Form16Report />}
             </div>
           )}

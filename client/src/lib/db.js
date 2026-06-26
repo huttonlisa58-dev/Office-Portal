@@ -195,6 +195,30 @@ export const org = {
 // ---------- attendance ----------
 export const attendance = {
   punch: (action, extra = {}) => invoke('attendance-punch', { action, ...extra }),
+  async activitySummary(start, end) {
+    const { data } = await supabase.from('attendance_punches')
+      .select('employee_id, work_date, type, punched_at, employee:employees(first_name,last_name,employee_code)')
+      .gte('work_date', start).lte('work_date', end)
+      .order('punched_at', { ascending: true });
+    const groups = {};
+    (data || []).forEach((p) => {
+      const key = `${p.employee_id}|${p.work_date}`;
+      (groups[key] ||= { employeeId: p.employee_id, date: p.work_date, employee: mEmpRef(p.employee), punches: [] }).punches.push(p);
+    });
+    return Object.values(groups).map((g) => {
+      const ps = g.punches;
+      let active = 0, openIn = null, sessions = 0;
+      for (const p of ps) {
+        if (p.type === 'IN') { openIn = new Date(p.punched_at); }
+        else if (p.type === 'OUT' && openIn) { active += Math.max(0, (new Date(p.punched_at) - openIn) / 60000); sessions += 1; openIn = null; }
+      }
+      const first = new Date(ps[0].punched_at), last = new Date(ps[ps.length - 1].punched_at);
+      const span = Math.max(0, (last - first) / 60000);
+      const activeMin = Math.round(active);
+      const idleMin = Math.max(0, Math.round(span - active));
+      return { employeeId: g.employeeId, date: g.date, employee: g.employee, firstIn: ps[0].punched_at, lastOut: ps[ps.length - 1].punched_at, sessions, activeMin, idleMin };
+    }).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  },
   async manualPunches(start, end) {
     const { data } = await supabase.from('attendance_punches')
       .select('work_date, type, punched_at, method, remarks, employee:employees(first_name,last_name,employee_code)')
