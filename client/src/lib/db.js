@@ -187,6 +187,13 @@ export const org = {
 // ---------- attendance ----------
 export const attendance = {
   punch: (action, extra = {}) => invoke('attendance-punch', { action, ...extra }),
+  async manualPunches(start, end) {
+    const { data } = await supabase.from('attendance_punches')
+      .select('work_date, type, punched_at, method, remarks, employee:employees(first_name,last_name,employee_code)')
+      .eq('method', 'MANUAL').gte('work_date', start).lte('work_date', end)
+      .order('punched_at', { ascending: false });
+    return (data || []).map((p) => ({ date: p.work_date, type: p.type, at: p.punched_at, remarks: p.remarks, employee: mEmpRef(p.employee) }));
+  },
   async myToday(employeeId, tz = 'UTC') {
     if (!employeeId) return null;
     const date = todayInTz(tz);
