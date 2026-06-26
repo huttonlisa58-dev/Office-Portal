@@ -575,6 +575,32 @@ export const performance = {
   },
 };
 
+// ---------- call tracker ----------
+export const callLogs = {
+  async list(viewer = {}) {
+    const seesAll = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR', 'MANAGER'].includes(viewer.role);
+    let q = supabase.from('call_logs').select('*, employee:employees(first_name,last_name,employee_code)').order('called_at', { ascending: false });
+    if (!seesAll) { if (!viewer.employeeId) return []; q = q.eq('employee_id', viewer.employeeId); }
+    const { data } = await q;
+    return (data || []).map((c) => ({
+      _id: c.id, contactName: c.contact_name, contactNumber: c.contact_number, direction: c.direction,
+      purpose: c.purpose, outcome: c.outcome, durationMin: c.duration_min, notes: c.notes,
+      followUpDate: c.follow_up_date, calledAt: c.called_at, employeeId: c.employee_id, employee: mEmpRef(c.employee),
+    }));
+  },
+  async create({ companyId, employeeId, contactName, contactNumber, direction, purpose, outcome, durationMin, notes, followUpDate, calledAt }) {
+    if (!employeeId) throw new Error('No employee linked to this account');
+    const { error } = await supabase.from('call_logs').insert({
+      company_id: companyId, employee_id: employeeId, contact_name: contactName || null, contact_number: contactNumber || null,
+      direction: direction || 'OUTBOUND', purpose: purpose || null, outcome: outcome || null,
+      duration_min: durationMin === '' || durationMin == null ? null : Number(durationMin), notes: notes || null,
+      follow_up_date: followUpDate || null, called_at: calledAt ? new Date(calledAt).toISOString() : new Date().toISOString(),
+    });
+    if (error) throw new Error(error.message);
+  },
+  async remove(id) { const { error } = await supabase.from('call_logs').delete().eq('id', id); if (error) throw new Error(error.message); },
+};
+
 // ---------- notifications ----------
 export const notifications = {
   async list() {

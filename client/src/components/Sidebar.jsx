@@ -40,7 +40,7 @@ const NAV = [
     { href: '/tasks', label: 'Tasks & goals' },
     { href: '/performance', label: 'Appraisals' },
   ] },
-  { href: '#', label: 'Call tracker', icon: Phone, locked: true },
+  { href: '/call-tracker', label: 'Call tracker', icon: Phone },
   { label: 'Payroll', icon: Wallet, children: [
     { href: '/payroll', label: 'Payroll' },
     { href: '/payroll/revisions', label: 'Salary revisions' },
