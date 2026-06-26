@@ -54,7 +54,7 @@ export default function PayrollPage() {
       .net{margin-top:20px;background:#f1f5f9;border-radius:12px;padding:14px 16px;display:flex;justify-content:space-between;font-size:17px;font-weight:700}
       .hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #1f49f5;padding-bottom:12px}</style></head>
       <body>${brand}<div class="hd"><div><h1>Payslip</h1><div class="muted">${MONTHS[p.month - 1]} ${p.year}</div></div>
-      <div class="muted r">${name}<br/>${p.employee?.employeeId || ''}<br/>Status: ${p.status}</div></div>
+      <div class="muted r">${name}<br/>${p.employee?.employeeId || ''}${p.employee?.pan ? `<br/>PAN: ${p.employee.pan}` : ''}${p.employee?.uan ? `<br/>UAN: ${p.employee.uan}` : ''}${p.employee?.bankAccountNumber ? `<br/>A/C: ${p.employee.bankAccountNumber}${p.employee?.bankName ? ` (${p.employee.bankName})` : ''}` : ''}<br/>Status: ${p.status}</div></div>
       <div class="grid">
         <div><table><tr><th>Earnings</th><th class="r">Amount</th></tr>${rows(earnings)}<tr class="tot"><td>Gross</td><td class="r">${fmt(totalEarn)}</td></tr></table></div>
         <div><table><tr><th>Deductions</th><th class="r">Amount</th></tr>${deductions.length ? rows(deductions) : '<tr><td class="muted">None</td><td></td></tr>'}<tr class="tot"><td>Total deductions</td><td class="r">${fmt(totalDed)}</td></tr></table></div>

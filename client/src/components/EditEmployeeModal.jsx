@@ -35,6 +35,8 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
         employmentType: e.employmentType || 'FULL_TIME', status: e.status || 'ACTIVE',
         dateOfJoining: e.dateOfJoining || '', deptId: e.departmentId || '', desigId: e.designationId || '', managerId: '',
         shiftId: e.shiftId || '', weeklyOff: e.weeklyOff ?? '',
+        pan: e.pan || '', uan: e.uan || '', pfNumber: e.pfNumber || '', esiNumber: e.esiNumber || '',
+        bankAccountName: e.bankAccountName || '', bankAccountNumber: e.bankAccountNumber || '', bankIfsc: e.bankIfsc || '', bankName: e.bankName || '',
       });
     }).catch(() => {}).finally(() => setLoading(false));
   }, [emp]);
@@ -50,6 +52,8 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
         employment_type: form.employmentType, status: form.status,
         department_id: form.deptId || null, designation_id: form.desigId || null,
         shift_id: form.shiftId || null, weekly_off: form.weeklyOff === '' ? null : Number(form.weeklyOff),
+        pan: form.pan || null, uan: form.uan || null, pf_number: form.pfNumber || null, esi_number: form.esiNumber || null,
+        bank_account_name: form.bankAccountName || null, bank_account_number: form.bankAccountNumber || null, bank_ifsc: form.bankIfsc || null, bank_name: form.bankName || null,
         ...(form.managerId ? { manager_id: form.managerId } : {}),
       });
 
@@ -109,6 +113,18 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
           <Fld label="Employee status"><select className="input" value={form.status || 'ACTIVE'} onChange={set('status')}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></Fld>
           <Fld label="Shift"><select className="input" value={form.shiftId || ''} onChange={set('shiftId')}><option value="">— none —</option>{shiftOpts.map((s) => <option key={s._id} value={s._id}>{s.name}{s.start ? ` (${String(s.start).slice(0, 5)}–${String(s.end).slice(0, 5)})` : ''}</option>)}</select></Fld>
           <Fld label="Weekly off"><select className="input" value={form.weeklyOff === '' ? '' : String(form.weeklyOff)} onChange={set('weeklyOff')}><option value="">— none —</option>{WEEK.map((w, i) => <option key={w} value={i}>{w}</option>)}</select></Fld>
+        </div>
+
+        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Statutory &amp; bank details</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Fld label="PAN"><input className="input" value={form.pan || ''} onChange={set('pan')} placeholder="ABCDE1234F" /></Fld>
+          <Fld label="UAN (PF)"><input className="input" value={form.uan || ''} onChange={set('uan')} /></Fld>
+          <Fld label="PF number"><input className="input" value={form.pfNumber || ''} onChange={set('pfNumber')} /></Fld>
+          <Fld label="ESI number"><input className="input" value={form.esiNumber || ''} onChange={set('esiNumber')} /></Fld>
+          <Fld label="Bank account holder"><input className="input" value={form.bankAccountName || ''} onChange={set('bankAccountName')} /></Fld>
+          <Fld label="Bank account number"><input className="input" value={form.bankAccountNumber || ''} onChange={set('bankAccountNumber')} /></Fld>
+          <Fld label="IFSC"><input className="input" value={form.bankIfsc || ''} onChange={set('bankIfsc')} /></Fld>
+          <Fld label="Bank name"><input className="input" value={form.bankName || ''} onChange={set('bankName')} /></Fld>
         </div>
 
         <div className="flex justify-end gap-2 border-t pt-3 dark:border-slate-700">
