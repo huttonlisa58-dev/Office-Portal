@@ -443,6 +443,29 @@ export const leavePolicies = {
   },
 };
 
+export const leaveEncashment = {
+  async list() {
+    const { data } = await supabase
+      .from('leave_encashments')
+      .select('*, employee:employees(first_name,last_name,employee_code)')
+      .order('created_at', { ascending: false });
+    return (data || []).map((r) => ({
+      _id: r.id, employeeId: r.employee_id, leaveType: r.leave_type, days: Number(r.days || 0), amount: Number(r.amount || 0),
+      status: r.status, requestedOn: r.requested_on, decidedAt: r.decided_at, employee: mEmpRef(r.employee),
+    }));
+  },
+  async request({ companyId, employeeId, leaveType, days, amount }) {
+    const { error } = await supabase.from('leave_encashments').insert({
+      company_id: companyId, employee_id: employeeId, leave_type: leaveType, days: Number(days), amount: Number(amount || 0), status: 'PENDING',
+    });
+    if (error) throw new Error(error.message);
+  },
+  async decide(id, approve, note = null) {
+    const { error } = await supabase.rpc('decide_encashment', { p_id: id, p_approve: approve, p_note: note });
+    if (error) throw new Error(error.message);
+  },
+};
+
 // ---------- payroll ----------
 export const payroll = {
   async list(viewer = {}) {

@@ -35,6 +35,7 @@ const NAV = [
     { href: '/leaves/holidays', label: 'Holidays' },
     { href: '/leaves/rollover', label: 'Leave rollover' },
     { href: '/leaves/compoff', label: 'Comp off request' },
+    { href: '/leaves/encashment', label: 'Leave encashment' },
   ] },
   { label: 'Performance management', icon: Activity, children: [
     { href: '/tasks', label: 'Tasks & goals' },
