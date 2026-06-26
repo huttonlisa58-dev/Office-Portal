@@ -124,7 +124,16 @@ export const employees = {
     let query = supabase.from('employees')
       .select('*, department:departments(name), designation:designations(title), account:profiles!fk_profiles_employee(role)', { count: 'exact' })
       .order('created_at', { ascending: false });
-    if (q) query = query.or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,employee_code.ilike.%${q}%,email.ilike.%${q}%`);
+    if (q) {
+      const s = q.trim();
+      let orClause = `first_name.ilike.%${s}%,last_name.ilike.%${s}%,employee_code.ilike.%${s}%,email.ilike.%${s}%`;
+      const tokens = s.split(/\s+/);
+      if (tokens.length >= 2) { // full name with space: first token -> first_name, the rest -> last_name
+        const first = tokens[0]; const rest = tokens.slice(1).join(' ');
+        orClause += `,and(first_name.ilike.%${first}%,last_name.ilike.%${rest}%)`;
+      }
+      query = query.or(orClause);
+    }
     const from = (page - 1) * limit;
     query = query.range(from, from + limit - 1);
     const { data, count } = await query;
