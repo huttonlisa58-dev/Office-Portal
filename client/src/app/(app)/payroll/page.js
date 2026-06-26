@@ -234,15 +234,15 @@ function StructureEditor({ onClose }) {
   const { user } = useAuth();
   const employees = useEmployees();
   const [employeeId, setEmployeeId] = useState('');
-  const [form, setForm] = useState({ basic: 0, currency: 'USD', allowances: [], deductions: [], taxSlabs: [], taxRegime: 'CUSTOM' });
+  const [form, setForm] = useState({ basic: 0, currency: 'USD', allowances: [], deductions: [], taxSlabs: [], taxRegime: 'CUSTOM', epfEnabled: false, esiEnabled: false });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
     if (!employeeId) return;
     payApi.getStructure(employeeId).then((s) => {
-      if (s) setForm({ basic: s.basic, currency: s.currency || 'USD', allowances: s.allowances || [], deductions: s.deductions || [], taxSlabs: s.taxSlabs || [], taxRegime: s.taxRegime || 'CUSTOM' });
-      else setForm({ basic: 0, currency: 'USD', allowances: [], deductions: [], taxSlabs: [], taxRegime: 'CUSTOM' });
+      if (s) setForm({ basic: s.basic, currency: s.currency || 'USD', allowances: s.allowances || [], deductions: s.deductions || [], taxSlabs: s.taxSlabs || [], taxRegime: s.taxRegime || 'CUSTOM', epfEnabled: !!s.epfEnabled, esiEnabled: !!s.esiEnabled });
+      else setForm({ basic: 0, currency: 'USD', allowances: [], deductions: [], taxSlabs: [], taxRegime: 'CUSTOM', epfEnabled: false, esiEnabled: false });
     }).catch(() => {});
   }, [employeeId]);
 
@@ -258,7 +258,7 @@ function StructureEditor({ onClose }) {
         allowances: form.allowances.map((a) => ({ label: a.label, amount: Number(a.amount) })),
         deductions: form.deductions.map((d) => ({ label: d.label, amount: Number(d.amount) })),
         taxSlabs: form.taxSlabs.map((t) => ({ upTo: Number(t.upTo), rate: Number(t.rate) })),
-        taxRegime: form.taxRegime,
+        taxRegime: form.taxRegime, epfEnabled: form.epfEnabled, esiEnabled: form.esiEnabled,
       });
       setMsg('Saved.');
     } catch (e) { setMsg(e.message || 'Could not save'); }
@@ -302,6 +302,11 @@ function StructureEditor({ onClose }) {
             </div>
             <Section title="Allowances" k="allowances" fields={['label', 'amount']} />
             <Section title="Deductions" k="deductions" fields={['label', 'amount']} />
+            <div className="rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+              <p className="mb-2 text-sm font-medium">Statutory deductions (auto-calculated)</p>
+              <label className="flex items-center gap-2 py-1 text-sm"><input type="checkbox" checked={form.epfEnabled} onChange={(e) => setForm((f) => ({ ...f, epfEnabled: e.target.checked }))} /> EPF — 12% of basic (employee share)</label>
+              <label className="flex items-center gap-2 py-1 text-sm"><input type="checkbox" checked={form.esiEnabled} onChange={(e) => setForm((f) => ({ ...f, esiEnabled: e.target.checked }))} /> ESI — 0.75% of gross (only when gross ≤ ₹21,000)</label>
+            </div>
             <div>
               <label className="label">Tax regime</label>
               <select className="input" value={form.taxRegime} onChange={(e) => setForm((f) => ({ ...f, taxRegime: e.target.value }))}>

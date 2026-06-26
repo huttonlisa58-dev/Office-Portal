@@ -362,7 +362,7 @@ export const payroll = {
   },
   async getStructure(employeeId) {
     const { data } = await supabase.from('salary_structures').select('*').eq('employee_id', employeeId).maybeSingle();
-    return data ? { basic: data.basic, currency: data.currency, allowances: data.allowances, deductions: data.deductions, taxSlabs: data.tax_slabs, taxRegime: data.tax_regime || 'CUSTOM' } : null;
+    return data ? { basic: data.basic, currency: data.currency, allowances: data.allowances, deductions: data.deductions, taxSlabs: data.tax_slabs, taxRegime: data.tax_regime || 'CUSTOM', epfEnabled: data.epf_enabled || false, esiEnabled: data.esi_enabled || false } : null;
   },
   async allStructures() {
     const { data } = await supabase.from('salary_structures').select('*, employee:employees(first_name,last_name,employee_code)');
@@ -373,7 +373,7 @@ export const payroll = {
     }));
   },
   async saveStructure(company_id, employee_id, s) {
-    const row = { company_id, employee_id, basic: s.basic, currency: s.currency, allowances: s.allowances, deductions: s.deductions, tax_slabs: s.taxSlabs, tax_regime: s.taxRegime || 'CUSTOM' };
+    const row = { company_id, employee_id, basic: s.basic, currency: s.currency, allowances: s.allowances, deductions: s.deductions, tax_slabs: s.taxSlabs, tax_regime: s.taxRegime || 'CUSTOM', epf_enabled: !!s.epfEnabled, esi_enabled: !!s.esiEnabled };
     const { error } = await supabase.from('salary_structures').upsert(row, { onConflict: 'company_id,employee_id' });
     if (error) throw new Error(error.message);
   },
