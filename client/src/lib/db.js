@@ -11,6 +11,12 @@ const mEmp = (r) => r && ({
   role: Array.isArray(r.account) ? (r.account[0]?.role || null) : (r.account?.role || null),
 });
 const mEmpRef = (r) => r && ({ _id: r.id, firstName: r.first_name, lastName: r.last_name, employeeId: r.employee_code });
+function haversineM(lat1, lon1, lat2, lon2) {
+  const R = 6371000, toRad = (x) => (x * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
 const mLeave = (r) => ({ _id: r.id, type: r.leave_type, from: r.from_date, to: r.to_date, days: r.days, reason: r.reason, status: r.status, appliedOn: r.created_at, decisionNote: r.decision_note, decidedAt: r.decided_at || null, decidedBy: r.decider ? `${r.decider.first_name} ${r.decider.last_name}`.trim() : null, employee: r.employee ? { ...mEmpRef(r.employee), location: r.employee.location || null, designation: r.employee.designation?.title || null } : null });
 const mAtt = (r) => ({ _id: r.id, date: r.work_date, status: r.status, isLate: r.is_late, workedMinutes: r.worked_minutes, overtimeMinutes: r.overtime_minutes, checkIn: r.check_in_at ? { time: r.check_in_at, method: r.check_in_method } : null, checkOut: r.check_out_at ? { time: r.check_out_at } : null, employee: mEmpRef(r.employee) });
 const mPay = (r) => ({ _id: r.id, month: r.month, year: r.year, currency: r.currency, basic: r.basic, gross: r.gross, tax: r.tax, tds: r.tds, bonus: r.bonus, lopDays: r.lop_days, allowances: r.allowances || [], deductions: r.deductions || [], netPay: r.net_pay, status: r.status, isWithheld: r.is_withheld || false, employee: r.employee ? { ...mEmpRef(r.employee), pan: r.employee.pan || null, uan: r.employee.uan || null, bankAccountNumber: r.employee.bank_account_number || null, bankName: r.employee.bank_name || null } : null });
@@ -180,9 +186,9 @@ export const org = {
   addDesignation: async (company_id, title, level) => { const { error } = await supabase.from('designations').insert({ company_id, title, level: level ?? null }); if (error) throw new Error(error.message); },
   updDesignation: async (id, title, level) => { const { error } = await supabase.from('designations').update({ title, level: level ?? null }).eq('id', id); if (error) throw new Error(error.message); },
   delDesignation: async (id) => { const { error } = await supabase.from('designations').delete().eq('id', id); if (error) throw new Error(error.message); },
-  officeLocations: async () => { const { data } = await supabase.from('office_locations').select('*').order('name'); return (data || []).map((o) => ({ _id: o.id, name: o.name, address: o.address, isActive: o.is_active })); },
-  addOfficeLocation: async (company_id, name, address) => { const { error } = await supabase.from('office_locations').insert({ company_id, name, address: address || null, is_active: true }); if (error) throw new Error(error.message); },
-  updOfficeLocation: async (id, name, address) => { const { error } = await supabase.from('office_locations').update({ name, address: address || null }).eq('id', id); if (error) throw new Error(error.message); },
+  officeLocations: async () => { const { data } = await supabase.from('office_locations').select('*').order('name'); return (data || []).map((o) => ({ _id: o.id, name: o.name, address: o.address, latitude: o.latitude, longitude: o.longitude, radiusM: o.radius_m, isActive: o.is_active })); },
+  addOfficeLocation: async (company_id, p) => { const { error } = await supabase.from('office_locations').insert({ company_id, name: p.name, address: p.address || null, latitude: p.latitude ?? null, longitude: p.longitude ?? null, radius_m: p.radiusM ?? null, is_active: p.isActive !== false }); if (error) throw new Error(error.message); },
+  updOfficeLocation: async (id, p) => { const { error } = await supabase.from('office_locations').update({ name: p.name, address: p.address || null, latitude: p.latitude ?? null, longitude: p.longitude ?? null, radius_m: p.radiusM ?? null, is_active: p.isActive !== false }).eq('id', id); if (error) throw new Error(error.message); },
   delOfficeLocation: async (id) => { const { error } = await supabase.from('office_locations').delete().eq('id', id); if (error) throw new Error(error.message); },
 };
 
@@ -704,9 +710,24 @@ export const punch = {
     (data || []).forEach((p) => { (byDate[p.work_date] ||= []).push({ at: p.punched_at, type: p.type, method: p.method }); });
     return byDate;
   },
-  async toggle(companyId, employeeId, type) {
+  async toggle(companyId, employeeId, type, geo = null) {
+    let latitude = null, longitude = null, location_id = null, method = 'WEB', remarks = null;
+    if (geo && geo.lat != null && geo.lng != null) {
+      latitude = geo.lat; longitude = geo.lng; method = 'GEO';
+      const { data: offices } = await supabase.from('office_locations')
+        .select('id,name,latitude,longitude,radius_m').eq('company_id', companyId).eq('is_active', true);
+      const withCoords = (offices || []).filter((o) => o.latitude != null && o.longitude != null);
+      if (withCoords.length) {
+        let best = null;
+        for (const o of withCoords) { const d = haversineM(geo.lat, geo.lng, Number(o.latitude), Number(o.longitude)); if (!best || d < best.d) best = { o, d }; }
+        const radius = Number(best.o.radius_m || 200);
+        if (best.d <= radius) location_id = best.o.id;
+        else throw new Error(`Outside office geofence — you are ${best.d}m from ${best.o.name} (allowed ${radius}m).`);
+      }
+    }
     const { error } = await supabase.from('attendance_punches').insert({
       company_id: companyId, employee_id: employeeId, type, work_date: localDate(),
+      method, latitude, longitude, location_id, remarks,
     });
     if (error) throw new Error(error.message);
   },

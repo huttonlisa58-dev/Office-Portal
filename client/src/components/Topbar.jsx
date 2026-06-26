@@ -47,9 +47,17 @@ function CheckInOut() {
 
   if (!employeeId || !loaded) return null;
 
+  const getGeo = () => new Promise((resolve) => {
+    if (!('geolocation' in navigator)) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+    );
+  });
   const doPunch = async () => {
     setBusy(true);
-    try { await punch.toggle(companyId, employeeId, day.open ? 'OUT' : 'IN'); await refresh(); }
+    try { const geo = await getGeo(); await punch.toggle(companyId, employeeId, day.open ? 'OUT' : 'IN', geo); await refresh(); }
     catch (e) { alert(e.message || 'Could not record attendance'); }
     finally { setBusy(false); }
   };
