@@ -234,15 +234,15 @@ function StructureEditor({ onClose }) {
   const { user } = useAuth();
   const employees = useEmployees();
   const [employeeId, setEmployeeId] = useState('');
-  const [form, setForm] = useState({ basic: 0, currency: 'USD', allowances: [], deductions: [], taxSlabs: [] });
+  const [form, setForm] = useState({ basic: 0, currency: 'USD', allowances: [], deductions: [], taxSlabs: [], taxRegime: 'CUSTOM' });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
 
   useEffect(() => {
     if (!employeeId) return;
     payApi.getStructure(employeeId).then((s) => {
-      if (s) setForm({ basic: s.basic, currency: s.currency || 'USD', allowances: s.allowances || [], deductions: s.deductions || [], taxSlabs: s.taxSlabs || [] });
-      else setForm({ basic: 0, currency: 'USD', allowances: [], deductions: [], taxSlabs: [] });
+      if (s) setForm({ basic: s.basic, currency: s.currency || 'USD', allowances: s.allowances || [], deductions: s.deductions || [], taxSlabs: s.taxSlabs || [], taxRegime: s.taxRegime || 'CUSTOM' });
+      else setForm({ basic: 0, currency: 'USD', allowances: [], deductions: [], taxSlabs: [], taxRegime: 'CUSTOM' });
     }).catch(() => {});
   }, [employeeId]);
 
@@ -258,6 +258,7 @@ function StructureEditor({ onClose }) {
         allowances: form.allowances.map((a) => ({ label: a.label, amount: Number(a.amount) })),
         deductions: form.deductions.map((d) => ({ label: d.label, amount: Number(d.amount) })),
         taxSlabs: form.taxSlabs.map((t) => ({ upTo: Number(t.upTo), rate: Number(t.rate) })),
+        taxRegime: form.taxRegime,
       });
       setMsg('Saved.');
     } catch (e) { setMsg(e.message || 'Could not save'); }
@@ -301,7 +302,15 @@ function StructureEditor({ onClose }) {
             </div>
             <Section title="Allowances" k="allowances" fields={['label', 'amount']} />
             <Section title="Deductions" k="deductions" fields={['label', 'amount']} />
-            <Section title="Tax slabs (progressive)" k="taxSlabs" fields={['upTo', 'rate']} />
+            <div>
+              <label className="label">Tax regime</label>
+              <select className="input" value={form.taxRegime} onChange={(e) => setForm((f) => ({ ...f, taxRegime: e.target.value }))}>
+                <option value="CUSTOM">Custom slabs</option>
+                <option value="NEW_115BAC">New regime u/s 115BAC (2023 slabs)</option>
+              </select>
+              {form.taxRegime === 'NEW_115BAC' && <p className="mt-1 text-xs text-slate-400">Applies statutory annual slabs: 0% ≤3L, 5% 3–6L, 10% 6–9L, 15% 9–12L, 20% 12–15L, 30% &gt;15L. Custom slabs below are ignored.</p>}
+            </div>
+            {form.taxRegime === 'CUSTOM' && <Section title="Tax slabs (progressive, monthly)" k="taxSlabs" fields={['upTo', 'rate']} />}
             {msg && <div className="rounded-xl bg-slate-100 px-3 py-2 text-sm dark:bg-slate-800">{msg}</div>}
           </>
         )}
