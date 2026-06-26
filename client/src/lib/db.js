@@ -335,6 +335,32 @@ export const leaves = {
     const { data } = await q.maybeSingle();
     return data ? { balances: { CASUAL: data.casual, SICK: data.sick, EARNED: data.earned, COMPOFF: data.compoff || 0 } } : null;
   },
+  async availableSummary() {
+    const year = new Date().getFullYear();
+    const { data } = await supabase.from('leave_balances')
+      .select('*, employee:employees(first_name,last_name,employee_code)').eq('year', year);
+    return (data || []).map((b) => ({
+      employeeId: b.employee_id, employee: mEmpRef(b.employee), year,
+      casual: Number(b.casual || 0), sick: Number(b.sick || 0), earned: Number(b.earned || 0), compoff: Number(b.compoff || 0),
+      total: Number(b.casual || 0) + Number(b.sick || 0) + Number(b.earned || 0) + Number(b.compoff || 0),
+    })).sort((a, b) => `${a.employee?.firstName}`.localeCompare(`${b.employee?.firstName}`));
+  },
+  async appliedSummary(start, end) {
+    const { data } = await supabase.from('leaves')
+      .select('employee_id, leave_type, days, status, from_date, employee:employees(first_name,last_name,employee_code)')
+      .gte('from_date', start).lte('from_date', end);
+    const by = {};
+    (data || []).forEach((l) => {
+      const k = l.employee_id;
+      if (!by[k]) by[k] = { employeeId: k, employee: mEmpRef(l.employee), applied: 0, approved: 0, pending: 0, rejected: 0, days: 0 };
+      by[k].applied += 1;
+      const st = String(l.status).toUpperCase();
+      if (st === 'APPROVED') { by[k].approved += 1; by[k].days += Number(l.days || 0); }
+      else if (st === 'PENDING') by[k].pending += 1;
+      else if (st === 'REJECTED') by[k].rejected += 1;
+    });
+    return Object.values(by).sort((a, b) => b.days - a.days);
+  },
   async apply({ company_id, employee_id, type, from, to, reason }) {
     const days = Math.floor((new Date(to).setHours(0, 0, 0, 0) - new Date(from).setHours(0, 0, 0, 0)) / 86400000) + 1;
     const { error } = await supabase.from('leaves').insert({ company_id, employee_id, leave_type: type, from_date: from, to_date: to, days, reason });

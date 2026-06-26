@@ -162,6 +162,82 @@ function LeaveSummaryReport({ employeeId }) {
 
 function Empty({ text }) { return <div className="grid place-items-center py-12 text-sm text-slate-400">{text}</div>; }
 
+function AvailableLeaveReport() {
+  const [rows, setRows] = useState(null);
+  useEffect(() => { let a = true; leaveApi.availableSummary().then((d) => { if (a) setRows(d); }).catch(() => { if (a) setRows([]); }); return () => { a = false; }; }, []);
+  const exportCSV = () => {
+    const header = ['Employee', 'Code', 'Casual', 'Sick', 'Earned', 'Comp-off', 'Total'];
+    const body = (rows || []).map((r) => [`${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim(), r.employee?.employeeId || '', r.casual, r.sick, r.earned, r.compoff, r.total]);
+    downloadCSV('available_leave_summary.csv', [header, ...body]);
+  };
+  return (
+    <div className="card p-0">
+      <div className="flex items-center justify-between border-b px-4 py-3 dark:border-slate-700">
+        <h3 className="font-semibold">Available leave summary</h3>
+        <button onClick={exportCSV} disabled={!rows?.length} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"><Download size={15} /> Export CSV</button>
+      </div>
+      <div className="p-3 sm:p-4">
+        {rows === null ? <Loader /> : !rows.length ? <Empty text="No leave balances found." /> : (
+          <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-sm">
+            <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700">
+              <th className="px-3 py-2.5">Employee</th><th className="px-3 py-2.5">Casual</th><th className="px-3 py-2.5">Sick</th><th className="px-3 py-2.5">Earned</th><th className="px-3 py-2.5">Comp-off</th><th className="px-3 py-2.5">Total</th>
+            </tr></thead>
+            <tbody>{rows.map((r) => (
+              <tr key={r.employeeId} className="border-b dark:border-slate-700">
+                <td className="px-3 py-2.5"><div className="font-medium">{r.employee?.firstName} {r.employee?.lastName}</div><div className="text-[10px] text-slate-400">{r.employee?.employeeId}</div></td>
+                <td className="px-3 py-2.5">{r.casual}</td><td className="px-3 py-2.5">{r.sick}</td><td className="px-3 py-2.5">{r.earned}</td><td className="px-3 py-2.5">{r.compoff}</td>
+                <td className="px-3 py-2.5 font-semibold">{r.total}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AppliedLeaveReport() {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [start, setStart] = useState(() => { const d = new Date(); d.setMonth(d.getMonth() - 3); return d.toISOString().slice(0, 10); });
+  const [end, setEnd] = useState(todayStr);
+  const [rows, setRows] = useState(null);
+  useEffect(() => { let a = true; setRows(null); leaveApi.appliedSummary(start, end).then((d) => { if (a) setRows(d); }).catch(() => { if (a) setRows([]); }); return () => { a = false; }; }, [start, end]);
+  const exportCSV = () => {
+    const header = ['Employee', 'Code', 'Applied', 'Approved', 'Pending', 'Rejected', 'Approved days'];
+    const body = (rows || []).map((r) => [`${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim(), r.employee?.employeeId || '', r.applied, r.approved, r.pending, r.rejected, r.days]);
+    downloadCSV(`applied_leave_${start}_to_${end}.csv`, [header, ...body]);
+  };
+  return (
+    <div className="card p-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 dark:border-slate-700">
+        <h3 className="font-semibold">Applied leave summary</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <input type="date" className="input h-9 w-auto py-1" value={start} max={end} onChange={(e) => setStart(e.target.value)} />
+          <span className="text-xs text-slate-400">to</span>
+          <input type="date" className="input h-9 w-auto py-1" value={end} min={start} max={todayStr} onChange={(e) => setEnd(e.target.value)} />
+          <button onClick={exportCSV} disabled={!rows?.length} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"><Download size={15} /> Export CSV</button>
+        </div>
+      </div>
+      <div className="p-3 sm:p-4">
+        {rows === null ? <Loader /> : !rows.length ? <Empty text="No leaves applied in range." /> : (
+          <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-sm">
+            <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700">
+              <th className="px-3 py-2.5">Employee</th><th className="px-3 py-2.5">Applied</th><th className="px-3 py-2.5">Approved</th><th className="px-3 py-2.5">Pending</th><th className="px-3 py-2.5">Rejected</th><th className="px-3 py-2.5">Approved days</th>
+            </tr></thead>
+            <tbody>{rows.map((r) => (
+              <tr key={r.employeeId} className="border-b dark:border-slate-700">
+                <td className="px-3 py-2.5"><div className="font-medium">{r.employee?.firstName} {r.employee?.lastName}</div><div className="text-[10px] text-slate-400">{r.employee?.employeeId}</div></td>
+                <td className="px-3 py-2.5">{r.applied}</td><td className="px-3 py-2.5 text-emerald-600">{r.approved}</td><td className="px-3 py-2.5 text-amber-600">{r.pending}</td><td className="px-3 py-2.5 text-rose-600">{r.rejected}</td>
+                <td className="px-3 py-2.5 font-semibold">{r.days}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function sumAmt(arr) { return (arr || []).reduce((s, x) => s + Number(x.amount || 0), 0); }
 
 function hm(min) { const h = Math.floor(min / 60), m = Math.round(min % 60); return h ? `${h}h ${m}m` : `${m}m`; }
@@ -505,6 +581,8 @@ const CATEGORIES = [
   ] },
   { key: 'leave', label: 'Leave tracker reports', icon: Plane, reports: [
     { key: 'leavesummary', label: 'My leave summary' },
+    { key: 'availableleave', label: 'Available leave summary', managerOnly: true },
+    { key: 'appliedleave', label: 'Applied leave summary', managerOnly: true },
   ] },
   { key: 'payroll', label: 'Payroll reports', icon: Wallet, managerOnly: true, reports: [
     { key: 'ctc', label: 'CTC report' },
@@ -560,6 +638,8 @@ export default function ReportsPage() {
               {report === 'entryexit' && <EntryExitReport employeeId={employeeId} />}
               {report === 'empattendance' && <EmployeeAttendanceReport viewer={{ role: user?.role, employeeId: user?.employee }} />}
               {report === 'leavesummary' && <LeaveSummaryReport employeeId={employeeId} />}
+              {report === 'availableleave' && <AvailableLeaveReport />}
+              {report === 'appliedleave' && <AppliedLeaveReport />}
               {report === 'ctc' && <CTCReport />}
               {report === 'manualentry' && <ManualEntryReport />}
               {report === 'activity' && <ActivityReport />}
