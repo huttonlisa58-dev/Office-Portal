@@ -210,6 +210,24 @@ export const org = {
 // ---------- attendance ----------
 export const attendance = {
   punch: (action, extra = {}) => invoke('attendance-punch', { action, ...extra }),
+  async entryExit(start, end) {
+    const { data } = await supabase.from('attendance_punches')
+      .select('employee_id, work_date, type, punched_at, method, employee:employees(first_name,last_name,employee_code)')
+      .gte('work_date', start).lte('work_date', end)
+      .order('punched_at', { ascending: true });
+    const groups = {};
+    (data || []).forEach((p) => {
+      const key = `${p.employee_id}|${p.work_date}`;
+      (groups[key] ||= { employeeId: p.employee_id, date: p.work_date, employee: mEmpRef(p.employee), ins: [], outs: [], count: 0, method: p.method }).count += 1;
+      if (p.type === 'IN') groups[key].ins.push(p.punched_at);
+      else if (p.type === 'OUT') groups[key].outs.push(p.punched_at);
+    });
+    return Object.values(groups).map((g) => ({
+      employeeId: g.employeeId, date: g.date, employee: g.employee,
+      firstIn: g.ins[0] || null, lastOut: g.outs.length ? g.outs[g.outs.length - 1] : null,
+      punches: g.count, method: g.method,
+    })).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : `${a.employee?.firstName}`.localeCompare(`${b.employee?.firstName}`)));
+  },
   async activitySummary(start, end) {
     const { data } = await supabase.from('attendance_punches')
       .select('employee_id, work_date, type, punched_at, employee:employees(first_name,last_name,employee_code)')

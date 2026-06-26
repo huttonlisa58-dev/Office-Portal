@@ -242,6 +242,53 @@ function sumAmt(arr) { return (arr || []).reduce((s, x) => s + Number(x.amount |
 
 function hm(min) { const h = Math.floor(min / 60), m = Math.round(min % 60); return h ? `${h}h ${m}m` : `${m}m`; }
 
+function OrgEntryExitReport() {
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const [start, setStart] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); });
+  const [end, setEnd] = useState(todayStr);
+  const [rows, setRows] = useState(null);
+  useEffect(() => { let a = true; setRows(null); attApi.entryExit(start, end).then((d) => { if (a) setRows(d); }).catch(() => { if (a) setRows([]); }); return () => { a = false; }; }, [start, end]);
+  const fmtDate = (d) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
+  const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+  const exportCSV = () => {
+    const header = ['Employee', 'Code', 'Date', 'First in', 'Last out', 'Punches', 'Method'];
+    const body = (rows || []).map((r) => [`${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim(), r.employee?.employeeId || '', r.date, fmtTime(r.firstIn), fmtTime(r.lastOut), r.punches, r.method || '']);
+    downloadCSV(`entry_exit_${start}_to_${end}.csv`, [header, ...body]);
+  };
+  return (
+    <div className="card p-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 dark:border-slate-700">
+        <h3 className="font-semibold">Entry / exit report</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <input type="date" className="input h-9 w-auto py-1" value={start} max={end} onChange={(e) => setStart(e.target.value)} />
+          <span className="text-xs text-slate-400">to</span>
+          <input type="date" className="input h-9 w-auto py-1" value={end} min={start} max={todayStr} onChange={(e) => setEnd(e.target.value)} />
+          <button onClick={exportCSV} disabled={!rows?.length} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"><Download size={15} /> Export CSV</button>
+        </div>
+      </div>
+      <div className="p-3 sm:p-4">
+        <p className="mb-3 text-xs text-slate-400">Organization-wide first check-in and last check-out per employee per day.</p>
+        {rows === null ? <Loader /> : !rows.length ? <Empty text="No check-in/out activity in range." /> : (
+          <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-sm">
+            <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700">
+              <th className="px-3 py-2.5">Employee</th><th className="px-3 py-2.5">Date</th><th className="px-3 py-2.5">First in</th><th className="px-3 py-2.5">Last out</th><th className="px-3 py-2.5">Punches</th>
+            </tr></thead>
+            <tbody>{rows.map((r, i) => (
+              <tr key={i} className="border-b dark:border-slate-700">
+                <td className="px-3 py-2.5"><div className="font-medium">{r.employee?.firstName} {r.employee?.lastName}</div><div className="text-[10px] text-slate-400">{r.employee?.employeeId}</div></td>
+                <td className="px-3 py-2.5 text-slate-500">{fmtDate(r.date)}</td>
+                <td className="px-3 py-2.5 tabular-nums text-emerald-600">{fmtTime(r.firstIn)}</td>
+                <td className="px-3 py-2.5 tabular-nums text-sky-600">{fmtTime(r.lastOut)}</td>
+                <td className="px-3 py-2.5">{r.punches}</td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ActivityReport() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const [start, setStart] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().slice(0, 10); });
@@ -578,6 +625,7 @@ const CATEGORIES = [
     { key: 'empattendance', label: 'Employee Attendance Report' },
     { key: 'manualentry', label: 'Manual time entries', managerOnly: true },
     { key: 'activity', label: 'Activity & idle time', managerOnly: true },
+    { key: 'orgentryexit', label: 'Entry / exit (organization)', managerOnly: true },
   ] },
   { key: 'leave', label: 'Leave tracker reports', icon: Plane, reports: [
     { key: 'leavesummary', label: 'My leave summary' },
@@ -643,6 +691,7 @@ export default function ReportsPage() {
               {report === 'ctc' && <CTCReport />}
               {report === 'manualentry' && <ManualEntryReport />}
               {report === 'activity' && <ActivityReport />}
+              {report === 'orgentryexit' && <OrgEntryExitReport />}
               {report === 'form16' && <Form16Report />}
             </div>
           )}
