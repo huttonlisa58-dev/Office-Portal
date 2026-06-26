@@ -164,6 +164,59 @@ function Empty({ text }) { return <div className="grid place-items-center py-12 
 
 function sumAmt(arr) { return (arr || []).reduce((s, x) => s + Number(x.amount || 0), 0); }
 
+function Form16Report() {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [rows, setRows] = useState(null);
+  useEffect(() => {
+    let a = true; setRows(null);
+    payApi.annualSummary(year).then((d) => { if (a) setRows(d); }).catch(() => { if (a) setRows([]); });
+    return () => { a = false; };
+  }, [year]);
+
+  const exportCSV = () => {
+    const header = ['Employee', 'Code', 'PAN', 'Months paid', 'Annual gross', 'Total TDS', 'Annual net'];
+    const body = (rows || []).map((r) => [`${r.employee?.firstName || ''} ${r.employee?.lastName || ''}`.trim(), r.employee?.employeeId || '', r.pan || '', r.months, r.gross, r.tds, r.net]);
+    downloadCSV(`form16_summary_${year}.csv`, [header, ...body]);
+  };
+
+  return (
+    <div className="card p-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 dark:border-slate-700">
+        <h3 className="font-semibold">Form-16 / annual TDS summary</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs text-slate-400">Year</label>
+          <input type="number" className="input h-9 w-24 py-1" value={year} onChange={(e) => setYear(Number(e.target.value))} />
+          <button onClick={exportCSV} disabled={!rows?.length} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"><Download size={15} /> Export CSV</button>
+        </div>
+      </div>
+      <div className="p-3 sm:p-4">
+        {rows === null ? <Loader /> : !rows.length ? <Empty text={`No payslips found for ${year}.`} /> : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700">
+                <th className="px-3 py-2.5">Employee</th><th className="px-3 py-2.5">PAN</th><th className="px-3 py-2.5">Months</th><th className="px-3 py-2.5">Annual gross</th><th className="px-3 py-2.5">Total TDS</th><th className="px-3 py-2.5">Annual net</th>
+              </tr></thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.employeeId} className="border-b dark:border-slate-700">
+                    <td className="px-3 py-2.5"><div className="font-medium">{r.employee?.firstName} {r.employee?.lastName}</div><div className="text-[10px] text-slate-400">{r.employee?.employeeId}</div></td>
+                    <td className="px-3 py-2.5 text-slate-500">{r.pan || '—'}</td>
+                    <td className="px-3 py-2.5">{r.months}</td>
+                    <td className="px-3 py-2.5 font-medium">{money(r.gross, r.currency)}</td>
+                    <td className="px-3 py-2.5 text-rose-600">{money(r.tds, r.currency)}</td>
+                    <td className="px-3 py-2.5 font-semibold text-emerald-600">{money(r.net, r.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ManualEntryReport() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const [start, setStart] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().slice(0, 10); });
@@ -393,6 +446,7 @@ const CATEGORIES = [
   ] },
   { key: 'payroll', label: 'Payroll reports', icon: Wallet, managerOnly: true, reports: [
     { key: 'ctc', label: 'CTC report' },
+    { key: 'form16', label: 'Form-16 / annual TDS summary' },
   ] },
 ];
 
@@ -446,6 +500,7 @@ export default function ReportsPage() {
               {report === 'leavesummary' && <LeaveSummaryReport employeeId={employeeId} />}
               {report === 'ctc' && <CTCReport />}
               {report === 'manualentry' && <ManualEntryReport />}
+              {report === 'form16' && <Form16Report />}
             </div>
           )}
         </div>
