@@ -442,6 +442,12 @@ export const payroll = {
   },
   markPaid: async (id) => { const { error } = await supabase.from('payrolls').update({ status: 'PAID' }).eq('id', id); if (error) throw new Error(error.message); },
   setWithheld: async (id, withheld) => { const { error } = await supabase.from('payrolls').update({ is_withheld: withheld }).eq('id', id); if (error) throw new Error(error.message); },
+  markUnpaid: async (id) => { const { error } = await supabase.from('payrolls').update({ status: 'GENERATED' }).eq('id', id); if (error) throw new Error(error.message); },
+  async payRuns() {
+    const { data } = await supabase.from('pay_runs').select('*').order('run_date', { ascending: false });
+    return (data || []).map((r) => ({ _id: r.id, period: r.period, runDate: r.run_date, status: r.status, total: Number(r.total_amount || 0), count: r.employee_count || 0 }));
+  },
+  deletePayRun: async (runId) => { const { error } = await supabase.rpc('delete_pay_run', { p_run_id: runId }); if (error) throw new Error(error.message); },
   async annualSummary(year) {
     const { data } = await supabase.from('payrolls')
       .select('employee_id, gross, net_pay, tax, tds, month, currency, employee:employees(first_name,last_name,employee_code,pan)')

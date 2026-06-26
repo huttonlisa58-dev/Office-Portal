@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Wallet, Plus, Download, BadgeCheck, Settings2, Play, Lock, LockOpen } from 'lucide-react';
+import { Wallet, Plus, Download, BadgeCheck, Settings2, Play, Lock, LockOpen, Layers, Undo2 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import Loader from '@/components/Loader';
 import Modal from '@/components/Modal';
@@ -19,6 +19,7 @@ export default function PayrollPage() {
   const [genOpen, setGenOpen] = useState(false);
   const [structOpen, setStructOpen] = useState(false);
   const [runAllOpen, setRunAllOpen] = useState(false);
+  const [payRunsOpen, setPayRunsOpen] = useState(false);
   const [q, setQ] = useState('');
   const [statusF, setStatusF] = useState('ALL');
 
@@ -79,6 +80,10 @@ export default function PayrollPage() {
     try { await payApi.setWithheld(p._id, withheld); load(); }
     catch (e) { alert(e.message || 'Action failed'); }
   };
+  const markUnpaid = async (p) => {
+    try { await payApi.markUnpaid(p._id); load(); }
+    catch (e) { alert(e.message || 'Action failed'); }
+  };
 
   const needle = q.trim().toLowerCase();
   const shown = items.filter((p) => {
@@ -97,6 +102,7 @@ export default function PayrollPage() {
           <div className="flex gap-2">
             <button className="btn-outline" onClick={() => setStructOpen(true)}><Settings2 size={16} /> Salary structure</button>
             <button className="btn-outline" onClick={() => setRunAllOpen(true)}><Play size={16} /> Run for all</button>
+            <button className="btn-outline" onClick={() => setPayRunsOpen(true)}><Layers size={16} /> Pay runs</button>
             <button className="btn-primary" onClick={() => setGenOpen(true)}><Plus size={16} /> Generate payroll</button>
           </div>
         )} />
@@ -140,6 +146,7 @@ export default function PayrollPage() {
                           ? <button className="btn-ghost p-1.5 text-sky-600" title="Release withheld" onClick={() => toggleHold(p, false)}><LockOpen size={16} /></button>
                           : p.status !== 'PAID' && <button className="btn-ghost p-1.5 text-amber-600" title="Withhold (full & final)" onClick={() => toggleHold(p, true)}><Lock size={16} /></button>)}
                         {canManage && p.status !== 'PAID' && !p.isWithheld && <button className="btn-ghost p-1.5 text-emerald-600" title="Mark paid" onClick={() => markPaid(p)}><BadgeCheck size={16} /></button>}
+                        {canManage && p.status === 'PAID' && <button className="btn-ghost p-1.5 text-slate-500" title="Mark unpaid" onClick={() => markUnpaid(p)}><Undo2 size={16} /></button>}
                       </div>
                     </td>
                   </tr>
@@ -152,6 +159,7 @@ export default function PayrollPage() {
 
       {genOpen && <GeneratePayroll onClose={() => setGenOpen(false)} onSaved={() => { setGenOpen(false); load(); }} />}
       {runAllOpen && <RunAllModal onClose={() => setRunAllOpen(false)} onSaved={() => { setRunAllOpen(false); load(); }} />}
+      {payRunsOpen && <PayRunsModal onClose={() => setPayRunsOpen(false)} onChanged={() => { load(); }} />}
       {structOpen && <StructureEditor onClose={() => setStructOpen(false)} />}
     </>
   );
@@ -324,6 +332,51 @@ function StructureEditor({ onClose }) {
           </>
         )}
       </div>
+    </Modal>
+  );
+}
+
+function PayRunsModal({ onClose, onChanged }) {
+  const [runs, setRuns] = useState(null);
+  const [busy, setBusy] = useState('');
+  const load = async () => { try { setRuns(await payApi.payRuns()); } catch { setRuns([]); } };
+  useEffect(() => { load(); }, []);
+  const del = async (r, isLatest) => {
+    if (!isLatest) { alert('Only the latest pay run can be deleted.'); return; }
+    if (!confirm(`Delete pay run ${r.period}? This removes its generated payslips and restores any loan EMI deducted in it.`)) return;
+    setBusy(r._id);
+    try { await payApi.deletePayRun(r._id); await load(); onChanged(); }
+    catch (e) { alert(e.message || 'Could not delete'); } finally { setBusy(''); }
+  };
+  return (
+    <Modal open onClose={onClose} title="Pay runs"
+      footer={<button className="btn-outline" onClick={onClose}>Close</button>}>
+      {runs === null ? <div className="py-8 text-center text-sm text-slate-400">Loading…</div>
+        : !runs.length ? <div className="py-8 text-center text-sm text-slate-400">No pay runs yet. Use “Run for all” to create one.</div>
+        : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b text-left text-slate-400">
+                {['Period', 'Run date', 'Employees', 'Total', 'Status', ''].map((h, i) => <th key={i} className="px-3 py-2 font-medium">{h}</th>)}
+              </tr></thead>
+              <tbody>
+                {runs.map((r, i) => (
+                  <tr key={r._id} className="border-b last:border-0">
+                    <td className="px-3 py-2 font-medium">{r.period}</td>
+                    <td className="px-3 py-2 text-slate-500">{r.runDate}</td>
+                    <td className="px-3 py-2">{r.count}</td>
+                    <td className="px-3 py-2">{money(r.total, 'INR')}</td>
+                    <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
+                    <td className="px-3 py-2 text-right">
+                      <button className="btn-ghost p-1.5 text-rose-500 disabled:opacity-40" title={i === 0 ? 'Delete latest pay run' : 'Only the latest run can be deleted'} disabled={i !== 0 || busy === r._id} onClick={() => del(r, i === 0)}><Undo2 size={15} /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-3 text-xs text-slate-400">Deleting the latest run removes its generated payslips and adds back any loan EMI it had deducted. To revert a single paid payslip, use the “Mark unpaid” action in the list.</p>
+          </div>
+        )}
     </Modal>
   );
 }
