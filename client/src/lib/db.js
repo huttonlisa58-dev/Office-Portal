@@ -364,6 +364,35 @@ export const payroll = {
   markPaid: async (id) => { const { error } = await supabase.from('payrolls').update({ status: 'PAID' }).eq('id', id); if (error) throw new Error(error.message); },
 };
 
+// ---------- salary revisions (CTC change log) ----------
+export const salaryRevisions = {
+  async list() {
+    const { data } = await supabase.from('salary_revisions')
+      .select('*, employee:employees(first_name,last_name,employee_code)')
+      .order('effective_date', { ascending: false });
+    return (data || []).map((r) => ({
+      _id: r.id, employeeId: r.employee_id, effectiveDate: r.effective_date,
+      oldCtc: r.old_ctc == null ? null : Number(r.old_ctc), newCtc: r.new_ctc == null ? null : Number(r.new_ctc),
+      reason: r.reason, createdAt: r.created_at, employee: mEmpRef(r.employee),
+    }));
+  },
+  async latestCtc(employeeId) {
+    if (!employeeId) return null;
+    const { data } = await supabase.from('salary_revisions').select('new_ctc').eq('employee_id', employeeId).order('effective_date', { ascending: false }).limit(1).maybeSingle();
+    return data ? Number(data.new_ctc) : null;
+  },
+  async create({ companyId, employeeId, effectiveDate, oldCtc, newCtc, reason }) {
+    if (!employeeId || !effectiveDate || newCtc === '' || newCtc == null) throw new Error('Employee, date and new CTC are required');
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from('salary_revisions').insert({
+      company_id: companyId, employee_id: employeeId, effective_date: effectiveDate,
+      old_ctc: oldCtc === '' || oldCtc == null ? null : Number(oldCtc), new_ctc: Number(newCtc),
+      reason: reason || null, created_by: user?.id || null,
+    });
+    if (error) throw new Error(error.message);
+  },
+};
+
 // ---------- tasks ----------
 export const tasks = {
   async list() {

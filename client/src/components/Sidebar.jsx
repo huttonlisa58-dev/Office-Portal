@@ -41,6 +41,7 @@ const NAV = [
   { href: '#', label: 'Call tracker', icon: Phone, locked: true },
   { label: 'Payroll', icon: Wallet, children: [
     { href: '/payroll', label: 'Payroll' },
+    { href: '/payroll/revisions', label: 'Salary revisions' },
     { href: '/expenses', label: 'Expenses & reimbursement' },
     { href: '/assets', label: 'Assets' },
   ] },
