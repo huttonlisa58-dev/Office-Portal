@@ -38,6 +38,7 @@ const NAV = [
   ] },
   { label: 'Performance management', icon: Activity, children: [
     { href: '/tasks', label: 'Tasks & goals' },
+    { href: '/performance', label: 'Appraisals' },
   ] },
   { href: '#', label: 'Call tracker', icon: Phone, locked: true },
   { label: 'Payroll', icon: Wallet, children: [

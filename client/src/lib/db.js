@@ -534,6 +534,41 @@ export const documents = {
   async remove(id) { const { error } = await supabase.from('documents').delete().eq('id', id); if (error) throw new Error(error.message); },
 };
 
+// ---------- performance / appraisals ----------
+export const performance = {
+  async cycles() {
+    const { data } = await supabase.from('review_cycles').select('*').order('start_date', { ascending: false });
+    return (data || []).map((c) => ({ _id: c.id, name: c.name, startDate: c.start_date, endDate: c.end_date, status: c.status }));
+  },
+  async createCycle({ companyId, name, startDate, endDate }) {
+    if (!name) throw new Error('Cycle name is required');
+    const { error } = await supabase.from('review_cycles').insert({ company_id: companyId, name, start_date: startDate || null, end_date: endDate || null, status: 'OPEN' });
+    if (error) throw new Error(error.message);
+  },
+  async reviews(viewer = {}) {
+    const seesAll = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR', 'MANAGER'].includes(viewer.role);
+    let q = supabase.from('performance_reviews').select('*, employee:employees(first_name,last_name,employee_code)').order('created_at', { ascending: false });
+    if (!seesAll) { if (!viewer.employeeId) return []; q = q.eq('employee_id', viewer.employeeId); }
+    const { data } = await q;
+    return (data || []).map((r) => ({
+      _id: r.id, period: r.period, rating: r.rating == null ? null : Number(r.rating),
+      strengths: r.strengths, improvements: r.improvements, summary: r.summary, status: r.status, createdAt: r.created_at,
+      employeeId: r.employee_id, employee: mEmpRef(r.employee),
+    }));
+  },
+  async createReview({ companyId, employeeId, period, rating, strengths, improvements, summary }) {
+    if (!employeeId || !period) throw new Error('Employee and period are required');
+    const { data: { user } } = await supabase.auth.getUser();
+    const reviewer = await supabase.from('profiles').select('employee_id').eq('id', user?.id).maybeSingle();
+    const { error } = await supabase.from('performance_reviews').insert({
+      company_id: companyId, employee_id: employeeId, reviewer_id: reviewer?.data?.employee_id || null,
+      period, rating: rating === '' || rating == null ? null : Number(rating),
+      strengths: strengths || null, improvements: improvements || null, summary: summary || null, status: 'COMPLETED',
+    });
+    if (error) throw new Error(error.message);
+  },
+};
+
 // ---------- notifications ----------
 export const notifications = {
   async list() {
