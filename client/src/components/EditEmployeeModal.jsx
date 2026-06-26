@@ -36,6 +36,7 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
         dateOfJoining: e.dateOfJoining || '', deptId: e.departmentId || '', desigId: e.designationId || '', managerId: '',
         shiftId: e.shiftId || '', weeklyOff: e.weeklyOff ?? '',
         pan: e.pan || '', uan: e.uan || '', pfNumber: e.pfNumber || '', esiNumber: e.esiNumber || '',
+        accessUntil: e.accessUntil || '',
         bankAccountName: e.bankAccountName || '', bankAccountNumber: e.bankAccountNumber || '', bankIfsc: e.bankIfsc || '', bankName: e.bankName || '',
       });
     }).catch(() => {}).finally(() => setLoading(false));
@@ -53,6 +54,7 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
         department_id: form.deptId || null, designation_id: form.desigId || null,
         shift_id: form.shiftId || null, weekly_off: form.weeklyOff === '' ? null : Number(form.weeklyOff),
         pan: form.pan || null, uan: form.uan || null, pf_number: form.pfNumber || null, esi_number: form.esiNumber || null,
+        access_until: form.accessUntil || null,
         bank_account_name: form.bankAccountName || null, bank_account_number: form.bankAccountNumber || null, bank_ifsc: form.bankIfsc || null, bank_name: form.bankName || null,
         ...(form.managerId ? { manager_id: form.managerId } : {}),
       });
@@ -113,6 +115,7 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
           <Fld label="Employee status"><select className="input" value={form.status || 'ACTIVE'} onChange={set('status')}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></Fld>
           <Fld label="Shift"><select className="input" value={form.shiftId || ''} onChange={set('shiftId')}><option value="">— none —</option>{shiftOpts.map((s) => <option key={s._id} value={s._id}>{s.name}{s.start ? ` (${String(s.start).slice(0, 5)}–${String(s.end).slice(0, 5)})` : ''}</option>)}</select></Fld>
           <Fld label="Weekly off"><select className="input" value={form.weeklyOff === '' ? '' : String(form.weeklyOff)} onChange={set('weeklyOff')}><option value="">— none —</option>{WEEK.map((w, i) => <option key={w} value={i}>{w}</option>)}</select></Fld>
+          <Fld label="Portal access until"><input type="date" className="input" value={form.accessUntil || ''} onChange={set('accessUntil')} /></Fld>
         </div>
 
         <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Statutory &amp; bank details</p>

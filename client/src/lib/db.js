@@ -42,8 +42,13 @@ export async function getMe() {
   let company = null;
   let employeeCode = null;
   if (profile?.employee_id) {
-    const { data: emp } = await supabase.from('employees').select('employee_code').eq('id', profile.employee_id).maybeSingle();
+    const { data: emp } = await supabase.from('employees').select('employee_code, access_until').eq('id', profile.employee_id).maybeSingle();
     employeeCode = emp?.employee_code || null;
+    const adminRole = ['SUPER_ADMIN', 'COMPANY_ADMIN'].includes(profile.role);
+    if (!adminRole && emp?.access_until && new Date().toISOString().slice(0, 10) > emp.access_until) {
+      await supabase.auth.signOut();
+      throw new Error(`Your portal access was disabled on ${emp.access_until}. Please contact HR.`);
+    }
   }
   if (profile?.company_id) {
     const { data: c } = await supabase.from('companies').select('*').eq('id', profile.company_id).single();
@@ -154,6 +159,7 @@ export const employees = {
       smoker: data.smoker || false,
       shiftId: data.shift_id || null, weeklyOff: data.weekly_off ?? null,
       pan: data.pan || null, uan: data.uan || null, pfNumber: data.pf_number || null, esiNumber: data.esi_number || null,
+      accessUntil: data.access_until || null,
       bankAccountName: data.bank_account_name || null, bankAccountNumber: data.bank_account_number || null, bankIfsc: data.bank_ifsc || null, bankName: data.bank_name || null,
       manager: data.manager ? { name: `${data.manager.first_name} ${data.manager.last_name || ''}`.trim(), code: data.manager.employee_code } : null,
     };

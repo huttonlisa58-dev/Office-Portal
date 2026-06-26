@@ -18,7 +18,8 @@ export function AuthProvider({ children }) {
       const me = await getMe();
       if (me) { setUser(me.user); setCompany(me.company); setProfile(me.profile); }
       else { setUser(null); setCompany(null); setProfile(null); }
-    } finally { setLoading(false); }
+    } catch { setUser(null); setCompany(null); setProfile(null); }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => {
@@ -32,7 +33,8 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-    await loadMe();
+    const me = await getMe(); // throws (after sign-out) if portal access is disabled
+    if (me) { setUser(me.user); setCompany(me.company); setProfile(me.profile); }
   };
 
   const logout = async () => {
