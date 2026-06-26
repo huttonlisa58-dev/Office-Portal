@@ -60,7 +60,7 @@ function EmployeeList({ canManage, user }) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div className="relative max-w-md flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input className="input pl-9" placeholder="Search for an employee name or ID" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
+          <input className="input pl-9" placeholder="Search by name, ID, band or division" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
         </div>
         {canManage && <button className="btn-primary" onClick={() => setOpen(true)}><Plus size={16} /> Add employee</button>}
       </div>

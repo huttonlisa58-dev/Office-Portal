@@ -37,6 +37,7 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
         shiftId: e.shiftId || '', weeklyOff: e.weeklyOff ?? '',
         pan: e.pan || '', uan: e.uan || '', pfNumber: e.pfNumber || '', esiNumber: e.esiNumber || '',
         accessUntil: e.accessUntil || '',
+        band: e.band || '', division: e.division || '',
         bankAccountName: e.bankAccountName || '', bankAccountNumber: e.bankAccountNumber || '', bankIfsc: e.bankIfsc || '', bankName: e.bankName || '',
       });
     }).catch(() => {}).finally(() => setLoading(false));
@@ -55,6 +56,7 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
         shift_id: form.shiftId || null, weekly_off: form.weeklyOff === '' ? null : Number(form.weeklyOff),
         pan: form.pan || null, uan: form.uan || null, pf_number: form.pfNumber || null, esi_number: form.esiNumber || null,
         access_until: form.accessUntil || null,
+        band: form.band || null, division: form.division || null,
         bank_account_name: form.bankAccountName || null, bank_account_number: form.bankAccountNumber || null, bank_ifsc: form.bankIfsc || null, bank_name: form.bankName || null,
         ...(form.managerId ? { manager_id: form.managerId } : {}),
       });
@@ -116,6 +118,8 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
           <Fld label="Shift"><select className="input" value={form.shiftId || ''} onChange={set('shiftId')}><option value="">— none —</option>{shiftOpts.map((s) => <option key={s._id} value={s._id}>{s.name}{s.start ? ` (${String(s.start).slice(0, 5)}–${String(s.end).slice(0, 5)})` : ''}</option>)}</select></Fld>
           <Fld label="Weekly off"><select className="input" value={form.weeklyOff === '' ? '' : String(form.weeklyOff)} onChange={set('weeklyOff')}><option value="">— none —</option>{WEEK.map((w, i) => <option key={w} value={i}>{w}</option>)}</select></Fld>
           <Fld label="Portal access until"><input type="date" className="input" value={form.accessUntil || ''} onChange={set('accessUntil')} /></Fld>
+          <Fld label="Band / grade"><input className="input" value={form.band} onChange={set('band')} placeholder="e.g. B2" /></Fld>
+          <Fld label="Division"><input className="input" value={form.division} onChange={set('division')} placeholder="e.g. Operations" /></Fld>
         </div>
 
         <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Statutory &amp; bank details</p>

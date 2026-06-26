@@ -126,7 +126,7 @@ export const employees = {
       .order('created_at', { ascending: false });
     if (q) {
       const s = q.trim();
-      let orClause = `first_name.ilike.%${s}%,last_name.ilike.%${s}%,employee_code.ilike.%${s}%,email.ilike.%${s}%`;
+      let orClause = `first_name.ilike.%${s}%,last_name.ilike.%${s}%,employee_code.ilike.%${s}%,email.ilike.%${s}%,band.ilike.%${s}%,division.ilike.%${s}%`;
       const tokens = s.split(/\s+/);
       if (tokens.length >= 2) { // full name with space: first token -> first_name, the rest -> last_name
         const first = tokens[0]; const rest = tokens.slice(1).join(' ');
@@ -169,6 +169,7 @@ export const employees = {
       shiftId: data.shift_id || null, weeklyOff: data.weekly_off ?? null,
       pan: data.pan || null, uan: data.uan || null, pfNumber: data.pf_number || null, esiNumber: data.esi_number || null,
       accessUntil: data.access_until || null,
+      band: data.band || null, division: data.division || null,
       bankAccountName: data.bank_account_name || null, bankAccountNumber: data.bank_account_number || null, bankIfsc: data.bank_ifsc || null, bankName: data.bank_name || null,
       manager: data.manager ? { name: `${data.manager.first_name} ${data.manager.last_name || ''}`.trim(), code: data.manager.employee_code } : null,
     };
