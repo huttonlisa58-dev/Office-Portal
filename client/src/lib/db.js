@@ -671,6 +671,28 @@ export const announcements = {
   remove: async (id) => { const { error } = await supabase.from('announcements').delete().eq('id', id); if (error) throw new Error(error.message); },
 };
 
+export const taxDeclarations = {
+  async list() {
+    const { data } = await supabase.from('income_tax_declarations')
+      .select('*, employee:employees(first_name,last_name,employee_code)')
+      .order('created_at', { ascending: false });
+    return (data || []).map((d) => ({
+      _id: d.id, employeeId: d.employee_id, financialYear: d.financial_year, regime: d.regime || 'OLD',
+      items: Array.isArray(d.declarations) ? d.declarations : [], totalDeclared: Number(d.total_declared || 0),
+      status: d.status || 'PENDING', createdAt: d.created_at, employee: mEmpRef(d.employee),
+    }));
+  },
+  submit: async ({ company_id, employee_id, financialYear, regime, items }) => {
+    const total = (items || []).reduce((s, i) => s + Number(i.amount || 0), 0);
+    const { error } = await supabase.from('income_tax_declarations').insert({
+      company_id, employee_id, financial_year: financialYear, regime, declarations: items || [], total_declared: total, status: 'PENDING',
+    });
+    if (error) throw new Error(error.message);
+  },
+  decide: async (id, status) => { const { error } = await supabase.from('income_tax_declarations').update({ status }).eq('id', id); if (error) throw new Error(error.message); },
+  remove: async (id) => { const { error } = await supabase.from('income_tax_declarations').delete().eq('id', id); if (error) throw new Error(error.message); },
+};
+
 // ---------- companies (super admin) ----------
 export const companies = {
   async list() {

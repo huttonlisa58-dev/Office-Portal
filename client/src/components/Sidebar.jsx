@@ -49,6 +49,7 @@ const NAV = [
     { href: '/payroll', label: 'Payroll' },
     { href: '/payroll/revisions', label: 'Salary revisions' },
     { href: '/payroll/loans', label: 'Loans & advances' },
+    { href: '/payroll/tax-declaration', label: 'Tax declaration' },
     { href: '/expenses', label: 'Expenses & reimbursement' },
     { href: '/assets', label: 'Assets' },
   ] },
