@@ -37,11 +37,22 @@ export default function TeamAttendanceGrid() {
   const [month, setMonth] = useState(now.getMonth());
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const canToggle = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR', 'MANAGER'].includes(user?.role);
 
-  useEffect(() => {
+  const reload = () => {
     setLoading(true);
     attApi.month(year, month, { role: user?.role, employeeId: user?.employee }).then(setData).catch(() => setData(null)).finally(() => setLoading(false));
-  }, [year, month, user]);
+  };
+  useEffect(() => { reload(); }, [year, month, user]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleDayOff = async (empId, cell) => {
+    if (!canToggle) return;
+    const makeOff = cell.raw !== 'WEEKLY_OFF';
+    const msg = makeOff ? `Mark ${cell.date} as a day off for this employee?` : `Mark ${cell.date} as a working day for this employee?`;
+    if (!window.confirm(msg)) return;
+    try { await attApi.setDayOff(empId, cell.date, makeOff); reload(); }
+    catch (e) { window.alert(e.message || 'Could not update working day'); }
+  };
 
   const days = useMemo(() => new Date(Date.UTC(year, month + 1, 0)).getUTCDate(), [year, month]);
   const todayStr = now.toISOString().slice(0, 10);
@@ -65,7 +76,8 @@ export default function TeamAttendanceGrid() {
         const isHol = holidayName.has(date);
         const worked = st === 'PRESENT' || st === 'LATE' || st === 'HALF_DAY';
         let code = '', title = '', workedOnOff = false, late = false;
-        if (worked) {
+        if (st === 'WEEKLY_OFF') { code = 'WO'; title = 'Day off (set by manager)'; }
+        else if (worked) {
           code = st === 'PRESENT' ? 'P' : st === 'LATE' ? 'L' : 'HD';
           if (st === 'LATE') { late = true; title = 'Late entry'; }
           if (isHol) { workedOnOff = true; title = `Worked on holiday: ${holidayName.get(date) || 'Holiday'}`; }
@@ -75,7 +87,7 @@ export default function TeamAttendanceGrid() {
         else if (weekend) { code = 'WO'; title = 'Week off'; }
         else if (date < todayStr) { code = 'A'; title = 'Absent'; }
         else { code = ''; }
-        cells.push({ date, code, title, workedOnOff, weekend, late });
+        cells.push({ date, code, title, workedOnOff, weekend, late, raw: st || null });
       }
       const present = cells.filter((c) => c.code === 'P' || c.code === 'L' || c.code === 'HD').length;
       return { emp, cells, present };
@@ -111,6 +123,7 @@ export default function TeamAttendanceGrid() {
           <span className="grid h-4 w-4 place-items-center rounded text-[9px] font-bold outline outline-2 outline-amber-500 bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">P</span>Worked on off-day/holiday
         </span>
         <span className="inline-flex items-center gap-1.5"><Turtle size={14} className="text-rose-500" /> Late entry</span>
+        {canToggle && <span className="text-slate-400">· Click any cell to switch a working day ↔ day off</span>}
       </div>
 
       {loading ? <Loader /> : !matrix ? (
@@ -144,7 +157,10 @@ export default function TeamAttendanceGrid() {
                   </td>
                   {cells.map((c, i) => (
                     <td key={i} className="border-b border-l p-0.5 text-center" style={{ minWidth: 30 }}>
-                      <div title={c.title} className={`relative mx-auto grid h-6 w-7 place-items-center rounded text-[9px] font-bold ${CELL[c.code] || ''} ${c.workedOnOff ? 'outline outline-2 outline-amber-500' : ''}`}>
+                      <div
+                        title={canToggle ? `${c.title || ''}${c.title ? ' · ' : ''}Click to toggle day off`.trim() : c.title}
+                        onClick={canToggle ? () => toggleDayOff(emp.id, c) : undefined}
+                        className={`relative mx-auto grid h-6 w-7 place-items-center rounded text-[9px] font-bold ${CELL[c.code] || ''} ${c.workedOnOff ? 'outline outline-2 outline-amber-500' : ''} ${canToggle ? 'cursor-pointer hover:ring-2 hover:ring-sky-400' : ''}`}>
                         {c.code}
                         {c.late && <Turtle size={9} className="absolute -right-0.5 -top-0.5 text-rose-500" />}
                       </div>

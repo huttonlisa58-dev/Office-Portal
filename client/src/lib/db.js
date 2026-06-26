@@ -210,6 +210,10 @@ export const org = {
 // ---------- attendance ----------
 export const attendance = {
   punch: (action, extra = {}) => invoke('attendance-punch', { action, ...extra }),
+  async setDayOff(employeeId, date, off) {
+    const { error } = await supabase.rpc('set_day_off', { p_employee_id: employeeId, p_date: date, p_off: off });
+    if (error) throw new Error(error.message);
+  },
   async entryExit(start, end) {
     const { data } = await supabase.from('attendance_punches')
       .select('employee_id, work_date, type, punched_at, method, employee:employees(first_name,last_name,employee_code)')
