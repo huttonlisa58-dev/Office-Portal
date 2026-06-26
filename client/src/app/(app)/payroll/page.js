@@ -18,6 +18,8 @@ export default function PayrollPage() {
   const [loading, setLoading] = useState(true);
   const [genOpen, setGenOpen] = useState(false);
   const [structOpen, setStructOpen] = useState(false);
+  const [q, setQ] = useState('');
+  const [statusF, setStatusF] = useState('ALL');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,6 +68,15 @@ export default function PayrollPage() {
     catch (e) { alert(e.message || 'Action failed'); }
   };
 
+  const needle = q.trim().toLowerCase();
+  const shown = items.filter((p) => {
+    if (statusF !== 'ALL' && p.status !== statusF) return false;
+    if (!needle) return true;
+    const name = `${p.employee?.firstName || ''} ${p.employee?.lastName || ''}`.toLowerCase();
+    const code = (p.employee?.employeeId || '').toLowerCase();
+    return name.includes(needle) || code.includes(needle);
+  });
+
   return (
     <>
       <PageHeader title="Payroll" subtitle="Generate runs, manage salary structures, and issue payslips"
@@ -81,6 +92,15 @@ export default function PayrollPage() {
           action={canManage && <button className="btn-primary" onClick={() => setGenOpen(true)}><Plus size={16} /> Generate payroll</button>} />
       ) : (
         <div className="card overflow-hidden">
+          <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3 dark:border-slate-700">
+            <input className="input h-9 w-full max-w-xs py-1" placeholder="Search employee name or ID…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <div className="flex flex-wrap gap-1.5">
+              {['ALL', 'GENERATED', 'PAID'].map((f) => (
+                <button key={f} onClick={() => setStatusF(f)} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${statusF === f ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'}`}>{f === 'ALL' ? 'All' : f[0] + f.slice(1).toLowerCase()}</button>
+              ))}
+            </div>
+            <span className="ml-auto text-xs text-slate-400">{shown.length} of {items.length}</span>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="border-b text-left text-slate-400">
@@ -90,7 +110,8 @@ export default function PayrollPage() {
                 <th className="px-5 py-3 font-medium text-right">Actions</th>
               </tr></thead>
               <tbody>
-                {items.map((p) => (
+                {shown.length === 0 && <tr><td colSpan={7} className="px-5 py-10 text-center text-slate-400">No matching payslips.</td></tr>}
+                {shown.map((p) => (
                   <tr key={p._id} className="border-b last:border-0">
                     <td className="px-5 py-3 font-medium">{p.employee?.firstName} {p.employee?.lastName} <span className="text-xs text-slate-400">({p.employee?.employeeId})</span></td>
                     <td className="px-5 py-3 text-slate-500">{MONTHS[p.month - 1]} {p.year}</td>
