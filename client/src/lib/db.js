@@ -361,6 +361,12 @@ export const payroll = {
     if (error) throw new Error(error.message);
   },
   generate: (payload) => invoke('payroll-generate', payload),
+  async runAll({ month, year }) {
+    const period = `${year}-${String(month).padStart(2, '0')}`;
+    const { data, error } = await supabase.rpc('process_pay_run', { p_period: period, p_month: Number(month), p_year: Number(year) });
+    if (error) throw new Error(error.message);
+    return data; // pay_run id
+  },
   markPaid: async (id) => { const { error } = await supabase.from('payrolls').update({ status: 'PAID' }).eq('id', id); if (error) throw new Error(error.message); },
 };
 

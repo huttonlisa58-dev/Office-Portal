@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
-import { Wallet, Plus, Download, BadgeCheck, Settings2 } from 'lucide-react';
+import { Wallet, Plus, Download, BadgeCheck, Settings2, Play } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import Loader from '@/components/Loader';
 import Modal from '@/components/Modal';
@@ -18,6 +18,7 @@ export default function PayrollPage() {
   const [loading, setLoading] = useState(true);
   const [genOpen, setGenOpen] = useState(false);
   const [structOpen, setStructOpen] = useState(false);
+  const [runAllOpen, setRunAllOpen] = useState(false);
   const [q, setQ] = useState('');
   const [statusF, setStatusF] = useState('ALL');
 
@@ -83,6 +84,7 @@ export default function PayrollPage() {
         actions={canManage && (
           <div className="flex gap-2">
             <button className="btn-outline" onClick={() => setStructOpen(true)}><Settings2 size={16} /> Salary structure</button>
+            <button className="btn-outline" onClick={() => setRunAllOpen(true)}><Play size={16} /> Run for all</button>
             <button className="btn-primary" onClick={() => setGenOpen(true)}><Plus size={16} /> Generate payroll</button>
           </div>
         )} />
@@ -134,6 +136,7 @@ export default function PayrollPage() {
       )}
 
       {genOpen && <GeneratePayroll onClose={() => setGenOpen(false)} onSaved={() => { setGenOpen(false); load(); }} />}
+      {runAllOpen && <RunAllModal onClose={() => setRunAllOpen(false)} onSaved={() => { setRunAllOpen(false); load(); }} />}
       {structOpen && <StructureEditor onClose={() => setStructOpen(false)} />}
     </>
   );
@@ -143,6 +146,29 @@ function useEmployees() {
   const [employees, setEmployees] = useState([]);
   useEffect(() => { empApi.list({ limit: 100 }).then((r) => setEmployees(r.items)).catch(() => {}); }, []);
   return employees;
+}
+
+function RunAllModal({ onClose, onSaved }) {
+  const now = new Date();
+  const [form, setForm] = useState({ month: now.getMonth() + 1, year: now.getFullYear() });
+  const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const run = async () => {
+    setBusy(true); setErr('');
+    try { await payApi.runAll({ month: form.month, year: form.year }); onSaved(); }
+    catch (e) { setErr(e.message || 'Run failed'); } finally { setBusy(false); }
+  };
+  return (
+    <Modal open onClose={onClose} title="Run payroll for all employees"
+      footer={<><button className="btn-outline" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={busy} onClick={run}>{busy ? 'Running…' : 'Run'}</button></>}>
+      {err && <div className="mb-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{err}</div>}
+      <div className="grid grid-cols-2 gap-4">
+        <div><label className="label">Month</label><select className="input" value={form.month} onChange={set('month')}>{MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}</select></div>
+        <div><label className="label">Year</label><input className="input" type="number" value={form.year} onChange={set('year')} /></div>
+      </div>
+      <p className="mt-3 text-xs text-slate-400">Generates payslips for every active employee who has a salary structure. Existing payslips for that month are skipped.</p>
+    </Modal>
+  );
 }
 
 function GeneratePayroll({ onClose, onSaved }) {
