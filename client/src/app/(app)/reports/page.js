@@ -458,6 +458,85 @@ function ManualEntryReport() {
   );
 }
 
+function PayrollRegisterReport() {
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const [rows, setRows] = useState(null);
+  const [status, setStatus] = useState('ALL');
+  const [year, setYear] = useState('ALL');
+  useEffect(() => { let a = true; payApi.list().then((d) => { if (a) setRows(d); }).catch(() => { if (a) setRows([]); }); return () => { a = false; }; }, []);
+
+  const years = useMemo(() => Array.from(new Set((rows || []).map((p) => p.year))).sort((a, b) => b - a), [rows]);
+  const statusOf = (p) => (p.isWithheld ? 'HELD' : p.status); // GENERATED | PAID | HELD
+  const filtered = useMemo(() => (rows || []).filter((p) => {
+    if (year !== 'ALL' && p.year !== Number(year)) return false;
+    if (status === 'ALL') return true;
+    return statusOf(p) === status;
+  }), [rows, status, year]);
+
+  const dedTotal = (p) => sumAmt(p.deductions);
+  const totals = useMemo(() => filtered.reduce((a, p) => ({ gross: a.gross + (p.gross || 0), ded: a.ded + dedTotal(p), tds: a.tds + (p.tds || p.tax || 0), net: a.net + (p.netPay || 0) }), { gross: 0, ded: 0, tds: 0, net: 0 }), [filtered]);
+
+  const exportCSV = () => {
+    const header = ['Employee', 'Code', 'Period', 'Gross', 'Deductions', 'TDS', 'Net pay', 'Status'];
+    const body = filtered.map((p) => [`${p.employee?.firstName || ''} ${p.employee?.lastName || ''}`.trim(), p.employee?.employeeId || '', `${MONTHS[p.month - 1]} ${p.year}`, p.gross || 0, dedTotal(p), p.tds || p.tax || 0, p.netPay || 0, statusOf(p)]);
+    downloadCSV(`payroll_register_${status}_${year}.csv`, [header, ...body]);
+  };
+
+  const badge = (s) => s === 'PAID' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300'
+    : s === 'HELD' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300'
+    : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
+
+  return (
+    <div className="card p-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 dark:border-slate-700">
+        <h3 className="font-semibold">Payroll register</h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <select className="input h-9 w-auto py-1" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="ALL">All statuses</option>
+            <option value="GENERATED">Generated (unpaid)</option>
+            <option value="PAID">Paid</option>
+            <option value="HELD">Held</option>
+          </select>
+          <select className="input h-9 w-auto py-1" value={year} onChange={(e) => setYear(e.target.value)}>
+            <option value="ALL">All years</option>
+            {years.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <button onClick={exportCSV} disabled={!filtered.length} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"><Download size={15} /> Export CSV</button>
+        </div>
+      </div>
+      <div className="p-3 sm:p-4">
+        <p className="mb-3 text-xs text-slate-400">All payslips, filterable by pay-run status (generated / paid / held).</p>
+        {rows === null ? <Loader /> : !filtered.length ? <Empty text="No payslips match this filter." /> : (
+          <div className="overflow-x-auto"><table className="w-full min-w-[720px] text-sm">
+            <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700">
+              <th className="px-3 py-2.5">Employee</th><th className="px-3 py-2.5">Period</th><th className="px-3 py-2.5 text-right">Gross</th><th className="px-3 py-2.5 text-right">Deductions</th><th className="px-3 py-2.5 text-right">TDS</th><th className="px-3 py-2.5 text-right">Net pay</th><th className="px-3 py-2.5">Status</th>
+            </tr></thead>
+            <tbody>{filtered.map((p) => (
+              <tr key={p._id} className="border-b dark:border-slate-700">
+                <td className="px-3 py-2.5"><div className="font-medium">{p.employee?.firstName} {p.employee?.lastName}</div><div className="text-[10px] text-slate-400">{p.employee?.employeeId}</div></td>
+                <td className="px-3 py-2.5 text-slate-500">{MONTHS[p.month - 1]} {p.year}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums">{money(p.gross, p.currency)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{money(dedTotal(p), p.currency)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{money(p.tds || p.tax || 0, p.currency)}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums font-semibold">{money(p.netPay, p.currency)}</td>
+                <td className="px-3 py-2.5"><span className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${badge(statusOf(p))}`}>{statusOf(p)}</span></td>
+              </tr>
+            ))}</tbody>
+            <tfoot><tr className="border-t-2 font-semibold dark:border-slate-600">
+              <td className="px-3 py-2.5" colSpan={2}>Total · {filtered.length} payslip(s)</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{money(totals.gross, 'INR')}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{money(totals.ded, 'INR')}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{money(totals.tds, 'INR')}</td>
+              <td className="px-3 py-2.5 text-right tabular-nums">{money(totals.net, 'INR')}</td>
+              <td className="px-3 py-2.5"></td>
+            </tr></tfoot>
+          </table></div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CTCReport() {
   const [rows, setRows] = useState(null);
   useEffect(() => {
@@ -633,6 +712,7 @@ const CATEGORIES = [
     { key: 'appliedleave', label: 'Applied leave summary', managerOnly: true },
   ] },
   { key: 'payroll', label: 'Payroll reports', icon: Wallet, managerOnly: true, reports: [
+    { key: 'payregister', label: 'Payroll register (by status)' },
     { key: 'ctc', label: 'CTC report' },
     { key: 'form16', label: 'Form-16 / annual TDS summary' },
   ] },
@@ -689,6 +769,7 @@ export default function ReportsPage() {
               {report === 'availableleave' && <AvailableLeaveReport />}
               {report === 'appliedleave' && <AppliedLeaveReport />}
               {report === 'ctc' && <CTCReport />}
+              {report === 'payregister' && <PayrollRegisterReport />}
               {report === 'manualentry' && <ManualEntryReport />}
               {report === 'activity' && <ActivityReport />}
               {report === 'orgentryexit' && <OrgEntryExitReport />}
