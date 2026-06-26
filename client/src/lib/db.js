@@ -728,6 +728,18 @@ export const kpis = {
   remove: async (id) => { const { error } = await supabase.from('kpis').delete().eq('id', id); if (error) throw new Error(error.message); },
 };
 
+export const profileDetails = {
+  async all(employeeId) {
+    const tables = ['dependents', 'emergency_contacts', 'employee_education', 'employee_experience', 'vehicle_details', 'visa_details', 'social_media'];
+    const results = await Promise.all(tables.map((t) => supabase.from(t).select('*').eq('employee_id', employeeId).order('created_at', { ascending: true })));
+    const out = {};
+    tables.forEach((t, i) => { out[t] = results[i].data || []; });
+    return out;
+  },
+  add: async (table, row) => { const { error } = await supabase.from(table).insert(row); if (error) throw new Error(error.message); },
+  remove: async (table, id) => { const { error } = await supabase.rpc('delete_profile_record', { p_table: table, p_id: id }); if (error) throw new Error(error.message); },
+};
+
 // ---------- companies (super admin) ----------
 export const companies = {
   async list() {
