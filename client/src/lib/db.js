@@ -400,6 +400,7 @@ export const leaves = {
     if (error) throw new Error(error.message);
   },
   decide: (leave_id, decision) => invoke('leave-decision', { leave_id, decision }),
+  async cancel(leaveId, note = null) { const { error } = await supabase.rpc('cancel_leave', { p_leave_id: leaveId, p_note: note }); if (error) throw new Error(error.message); },
   async approvers(leaveId) {
     if (!leaveId) return [];
     const { data, error } = await supabase.rpc('leave_approvers', { p_leave_id: leaveId });

@@ -84,6 +84,15 @@ export default function LeavesPage() {
     } catch (e) { window.alert(e.message || 'Accrual failed'); } finally { setAccruing(false); }
   };
 
+  const cancelLeave = async (l) => {
+    const msg = l.status === 'APPROVED'
+      ? 'Cancel this approved leave? The deducted balance will be restored.'
+      : 'Cancel this leave request?';
+    if (!window.confirm(msg)) return;
+    try { await leaveApi.cancel(l._id); load(); }
+    catch (e) { window.alert(e.message || 'Could not cancel leave'); }
+  };
+
   const mine = hasEmployee ? items.filter((l) => l.employee && l.employee.employeeId === user?.employeeCode) : items;
 
   const leaveDays = (from, to) => { if (!from || !to) return 0; const a = new Date(from + 'T00:00:00'); const b = new Date(to + 'T00:00:00'); return Math.max(0, Math.round((b - a) / 86400000) + 1); };
@@ -139,10 +148,10 @@ export default function LeavesPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead><tr className="border-b text-left text-slate-400">
-                  {['Start date', 'End date', 'Leave type', 'Applied by', 'Approval status', 'Leave count', 'LOP days', 'Applied date'].map((h) => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}
+                  {['Start date', 'End date', 'Leave type', 'Applied by', 'Approval status', 'Leave count', 'LOP days', 'Applied date', ''].map((h) => <th key={h} className="px-5 py-3 font-medium">{h}</th>)}
                 </tr></thead>
                 <tbody>
-                  {mine.length === 0 && <tr><td colSpan={8} className="px-5 py-8 text-center text-slate-400">No leave applications yet.</td></tr>}
+                  {mine.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-slate-400">No leave applications yet.</td></tr>}
                   {mine.map((l) => (
                     <tr key={l._id} className="border-b last:border-0">
                       <td className="px-5 py-3 font-medium">{fmt(l.from)}</td>
@@ -153,6 +162,11 @@ export default function LeavesPage() {
                       <td className="px-5 py-3">{l.days} day(s)</td>
                       <td className="px-5 py-3 text-slate-400">-</td>
                       <td className="px-5 py-3 text-slate-500">{fmt(l.from)}</td>
+                      <td className="px-5 py-3 text-right">
+                        {(l.status === 'PENDING' || (l.status === 'APPROVED' && canManage)) && (
+                          <button className="rounded-lg px-2.5 py-1 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40" onClick={() => cancelLeave(l)}>Cancel</button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
