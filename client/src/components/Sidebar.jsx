@@ -41,6 +41,7 @@ const NAV = [
   ] },
   { label: 'Performance management', icon: Activity, children: [
     { href: '/projects', label: 'Projects' },
+    { href: '/goals', label: 'Goals & KPIs' },
     { href: '/tasks', label: 'Tasks & goals' },
     { href: '/performance', label: 'Appraisals' },
   ] },

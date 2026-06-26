@@ -693,6 +693,41 @@ export const taxDeclarations = {
   remove: async (id) => { const { error } = await supabase.from('income_tax_declarations').delete().eq('id', id); if (error) throw new Error(error.message); },
 };
 
+export const goals = {
+  async list() {
+    const { data } = await supabase.from('goals').select('*, employee:employees(first_name,last_name,employee_code)').order('created_at', { ascending: false });
+    return (data || []).map((g) => ({
+      _id: g.id, employeeId: g.employee_id, title: g.title, description: g.description, weight: g.weight || 0,
+      targetDate: g.target_date, progress: g.progress || 0, status: g.status || 'NOT_STARTED', employee: mEmpRef(g.employee),
+    }));
+  },
+  create: async ({ company_id, employee_id, title, description, weight, targetDate }) => {
+    const { error } = await supabase.from('goals').insert({ company_id, employee_id, title, description: description || null, weight: Number(weight || 0), target_date: targetDate || null, progress: 0, status: 'NOT_STARTED' });
+    if (error) throw new Error(error.message);
+  },
+  setProgress: async (id, progress) => { const { error } = await supabase.rpc('set_goal_progress', { p_goal_id: id, p_progress: Number(progress) }); if (error) throw new Error(error.message); },
+  remove: async (id) => { const { error } = await supabase.from('goals').delete().eq('id', id); if (error) throw new Error(error.message); },
+};
+
+export const kpis = {
+  async list() {
+    const { data } = await supabase.from('kpis').select('*, employee:employees(first_name,last_name,employee_code)').order('created_at', { ascending: false });
+    return (data || []).map((k) => ({
+      _id: k.id, employeeId: k.employee_id, cycleId: k.cycle_id, name: k.name, weight: k.weight || 0,
+      target: k.target, actual: k.actual, score: k.score == null ? null : Number(k.score), employee: mEmpRef(k.employee),
+    }));
+  },
+  create: async ({ company_id, employee_id, name, weight, target, actual, score }) => {
+    const { error } = await supabase.from('kpis').insert({ company_id, employee_id, name, weight: Number(weight || 0), target: target || null, actual: actual || null, score: score === '' || score == null ? null : Number(score) });
+    if (error) throw new Error(error.message);
+  },
+  update: async (id, { name, weight, target, actual, score }) => {
+    const { error } = await supabase.from('kpis').update({ name, weight: Number(weight || 0), target: target || null, actual: actual || null, score: score === '' || score == null ? null : Number(score) }).eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+  remove: async (id) => { const { error } = await supabase.from('kpis').delete().eq('id', id); if (error) throw new Error(error.message); },
+};
+
 // ---------- companies (super admin) ----------
 export const companies = {
   async list() {
