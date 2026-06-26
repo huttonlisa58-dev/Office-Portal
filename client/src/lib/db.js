@@ -496,6 +496,44 @@ export const loans = {
   async close(id) { const { error } = await supabase.from('loans').update({ status: 'CLOSED', outstanding: 0 }).eq('id', id); if (error) throw new Error(error.message); },
 };
 
+// ---------- documents ----------
+export const documents = {
+  async list() {
+    const { data } = await supabase.from('documents')
+      .select('*, employee:employees(first_name,last_name,employee_code)')
+      .order('created_at', { ascending: false });
+    return (data || []).map((d) => ({
+      _id: d.id, name: d.name, category: d.category, filePath: d.file_url || null,
+      expiryDate: d.expiry_date || null, createdAt: d.created_at,
+      employeeId: d.employee_id, employee: mEmpRef(d.employee),
+    }));
+  },
+  async upload(file, companyId) {
+    if (!file || !companyId) return null;
+    const safe = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const path = `${companyId}/${Date.now()}_${safe}`;
+    const { error } = await supabase.storage.from('documents').upload(path, file, { upsert: false });
+    if (error) throw new Error(error.message);
+    return path;
+  },
+  async fileUrl(path) {
+    if (!path) return null;
+    const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 300);
+    if (error) throw new Error(error.message);
+    return data?.signedUrl || null;
+  },
+  async create({ companyId, employeeId, name, category, filePath, expiryDate }) {
+    if (!employeeId || !name) throw new Error('Employee and document name are required');
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from('documents').insert({
+      company_id: companyId, employee_id: employeeId, name, category: category || null,
+      file_url: filePath || null, expiry_date: expiryDate || null, uploaded_by: user?.id || null,
+    });
+    if (error) throw new Error(error.message);
+  },
+  async remove(id) { const { error } = await supabase.from('documents').delete().eq('id', id); if (error) throw new Error(error.message); },
+};
+
 // ---------- notifications ----------
 export const notifications = {
   async list() {
