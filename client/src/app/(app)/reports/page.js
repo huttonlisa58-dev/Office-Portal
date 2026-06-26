@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { BarChart3, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, LogIn, LogOut, ArrowLeft, Plane, Download, Users, Turtle } from 'lucide-react';
+import { BarChart3, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, LogIn, LogOut, ArrowLeft, Plane, Download, Users, Turtle, Wallet } from 'lucide-react';
 import PageBanner from '@/components/PageBanner';
 import Loader from '@/components/Loader';
 import { useAuth } from '@/context/AuthContext';
-import { punch, computeDay, leaves as leaveApi, attendance as attApi } from '@/lib/db';
+import { punch, computeDay, leaves as leaveApi, attendance as attApi, payroll as payApi } from '@/lib/db';
+import { money } from '@/lib/format';
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTHS_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -161,6 +162,62 @@ function LeaveSummaryReport({ employeeId }) {
 
 function Empty({ text }) { return <div className="grid place-items-center py-12 text-sm text-slate-400">{text}</div>; }
 
+function sumAmt(arr) { return (arr || []).reduce((s, x) => s + Number(x.amount || 0), 0); }
+
+function CTCReport() {
+  const [rows, setRows] = useState(null);
+  useEffect(() => {
+    let a = true;
+    payApi.allStructures().then((d) => { if (a) setRows(d); }).catch(() => { if (a) setRows([]); });
+    return () => { a = false; };
+  }, []);
+
+  const data = useMemo(() => (rows || []).map((s) => {
+    const allow = sumAmt(s.allowances);
+    const ded = sumAmt(s.deductions);
+    const gross = s.basic + allow;
+    return { id: s.employeeId, name: `${s.employee?.firstName || ''} ${s.employee?.lastName || ''}`.trim(), code: s.employee?.employeeId || '', currency: s.currency, basic: s.basic, allow, ded, gross, annual: gross * 12 };
+  }).sort((x, y) => y.annual - x.annual), [rows]);
+
+  const exportCSV = () => {
+    const header = ['Employee', 'Code', 'Basic (monthly)', 'Fixed allowance (monthly)', 'Monthly gross', 'Deductions (monthly)', 'Annual CTC'];
+    const body = data.map((r) => [r.name, r.code, r.basic, r.allow, r.gross, r.ded, r.annual]);
+    downloadCSV('ctc_report.csv', [header, ...body]);
+  };
+
+  return (
+    <div className="card p-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 dark:border-slate-700">
+        <h3 className="font-semibold">CTC report</h3>
+        <button onClick={exportCSV} disabled={!data.length} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"><Download size={15} /> Export CSV</button>
+      </div>
+      <div className="p-3 sm:p-4">
+        {rows === null ? <Loader /> : !data.length ? <Empty text="No salary structures defined yet." /> : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead><tr className="border-b text-left text-xs uppercase tracking-wide text-slate-400 dark:border-slate-700">
+                <th className="px-3 py-2.5">Employee</th><th className="px-3 py-2.5">Basic</th><th className="px-3 py-2.5">Fixed allowance</th><th className="px-3 py-2.5">Monthly gross</th><th className="px-3 py-2.5">Deductions</th><th className="px-3 py-2.5">Annual CTC</th>
+              </tr></thead>
+              <tbody>
+                {data.map((r) => (
+                  <tr key={r.id} className="border-b dark:border-slate-700">
+                    <td className="px-3 py-2.5"><div className="font-medium">{r.name}</div><div className="text-[10px] text-slate-400">{r.code}</div></td>
+                    <td className="px-3 py-2.5">{money(r.basic, r.currency)}</td>
+                    <td className="px-3 py-2.5 text-slate-500">{money(r.allow, r.currency)}</td>
+                    <td className="px-3 py-2.5 font-medium">{money(r.gross, r.currency)}</td>
+                    <td className="px-3 py-2.5 text-rose-600">{money(r.ded, r.currency)}</td>
+                    <td className="px-3 py-2.5 font-semibold text-emerald-600">{money(r.annual, r.currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const LEAVE_CODE = { CASUAL: 'CL', SICK: 'SL', EARNED: 'EL', UNPAID: 'LOP', MATERNITY: 'ML', PATERNITY: 'PL' };
 function eachDateStr(from, to, cb) { const d = new Date(from + 'T00:00:00Z'); const end = new Date(to + 'T00:00:00Z'); while (d <= end) { cb(d.toISOString().slice(0, 10), d.getUTCDay()); d.setUTCDate(d.getUTCDate() + 1); } }
 function downloadCSV(filename, rows) {
@@ -276,15 +333,20 @@ const CATEGORIES = [
   { key: 'leave', label: 'Leave tracker reports', icon: Plane, reports: [
     { key: 'leavesummary', label: 'My leave summary' },
   ] },
+  { key: 'payroll', label: 'Payroll reports', icon: Wallet, managerOnly: true, reports: [
+    { key: 'ctc', label: 'CTC report' },
+  ] },
 ];
 
 export default function ReportsPage() {
   const { user } = useAuth();
   const employeeId = user?.employee;
+  const canManage = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR'].includes(user?.role);
+  const CATEGORIES_VISIBLE = CATEGORIES.filter((c) => !c.managerOnly || canManage);
   const [cat, setCat] = useState('attendance');
   const [report, setReport] = useState(null);
 
-  const activeCat = CATEGORIES.find((c) => c.key === cat);
+  const activeCat = CATEGORIES_VISIBLE.find((c) => c.key === cat) || CATEGORIES_VISIBLE[0];
 
   return (
     <>
@@ -292,7 +354,7 @@ export default function ReportsPage() {
       <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
         {/* left rail */}
         <div className="card h-fit p-2">
-          {CATEGORIES.map((c) => {
+          {CATEGORIES_VISIBLE.map((c) => {
             const Icon = c.icon;
             return (
               <button key={c.key} onClick={() => { setCat(c.key); setReport(null); }}
@@ -324,6 +386,7 @@ export default function ReportsPage() {
               {report === 'entryexit' && <EntryExitReport employeeId={employeeId} />}
               {report === 'empattendance' && <EmployeeAttendanceReport viewer={{ role: user?.role, employeeId: user?.employee }} />}
               {report === 'leavesummary' && <LeaveSummaryReport employeeId={employeeId} />}
+              {report === 'ctc' && <CTCReport />}
             </div>
           )}
         </div>

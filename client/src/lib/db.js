@@ -355,6 +355,14 @@ export const payroll = {
     const { data } = await supabase.from('salary_structures').select('*').eq('employee_id', employeeId).maybeSingle();
     return data ? { basic: data.basic, currency: data.currency, allowances: data.allowances, deductions: data.deductions, taxSlabs: data.tax_slabs } : null;
   },
+  async allStructures() {
+    const { data } = await supabase.from('salary_structures').select('*, employee:employees(first_name,last_name,employee_code)');
+    return (data || []).map((s) => ({
+      employeeId: s.employee_id, currency: s.currency || 'INR', basic: Number(s.basic || 0),
+      allowances: Array.isArray(s.allowances) ? s.allowances : [], deductions: Array.isArray(s.deductions) ? s.deductions : [],
+      employee: mEmpRef(s.employee),
+    }));
+  },
   async saveStructure(company_id, employee_id, s) {
     const row = { company_id, employee_id, basic: s.basic, currency: s.currency, allowances: s.allowances, deductions: s.deductions, tax_slabs: s.taxSlabs };
     const { error } = await supabase.from('salary_structures').upsert(row, { onConflict: 'company_id,employee_id' });
