@@ -692,14 +692,14 @@ export const punch = {
     const { data } = await supabase.from('attendance_punches')
       .select('*').eq('employee_id', employeeId).eq('work_date', date)
       .order('punched_at', { ascending: true });
-    return (data || []).map((p) => ({ _id: p.id, at: p.punched_at, type: p.type, method: p.method }));
+    return (data || []).map((p) => ({ _id: p.id, at: p.punched_at, type: p.type, method: p.method, photo: p.photo_url || null }));
   },
   async forDate(employeeId, date) {
     if (!employeeId || !date) return [];
     const { data } = await supabase.from('attendance_punches')
       .select('*').eq('employee_id', employeeId).eq('work_date', date)
       .order('punched_at', { ascending: true });
-    return (data || []).map((p) => ({ _id: p.id, at: p.punched_at, type: p.type, method: p.method }));
+    return (data || []).map((p) => ({ _id: p.id, at: p.punched_at, type: p.type, method: p.method, photo: p.photo_url || null }));
   },
   async month(employeeId, start, end) {
     if (!employeeId) return {};
@@ -710,7 +710,7 @@ export const punch = {
     (data || []).forEach((p) => { (byDate[p.work_date] ||= []).push({ at: p.punched_at, type: p.type, method: p.method }); });
     return byDate;
   },
-  async toggle(companyId, employeeId, type, geo = null) {
+  async toggle(companyId, employeeId, type, geo = null, selfie = null) {
     let latitude = null, longitude = null, location_id = null, method = 'WEB', remarks = null;
     if (geo && geo.lat != null && geo.lng != null) {
       latitude = geo.lat; longitude = geo.lng; method = 'GEO';
@@ -725,11 +725,25 @@ export const punch = {
         else throw new Error(`Outside office geofence — you are ${best.d}m from ${best.o.name} (allowed ${radius}m).`);
       }
     }
+    let photo_url = null;
+    if (selfie) {
+      const path = `${companyId}/${employeeId}/${Date.now()}.jpg`;
+      const { error: upErr } = await supabase.storage.from('selfies').upload(path, selfie, { upsert: false, contentType: 'image/jpeg' });
+      if (upErr) throw new Error(upErr.message);
+      photo_url = path;
+      if (method === 'WEB') method = 'SELFIE';
+    }
     const { error } = await supabase.from('attendance_punches').insert({
       company_id: companyId, employee_id: employeeId, type, work_date: localDate(),
-      method, latitude, longitude, location_id, remarks,
+      method, latitude, longitude, location_id, remarks, photo_url,
     });
     if (error) throw new Error(error.message);
+  },
+  async photoUrl(path) {
+    if (!path) return null;
+    const { data, error } = await supabase.storage.from('selfies').createSignedUrl(path, 300);
+    if (error) throw new Error(error.message);
+    return data?.signedUrl || null;
   },
   // Manual check-in/check-out entry: inserts an IN (+ optional OUT) punch on a given work_date
   async addEntry({ companyId, employeeId, date, checkIn, checkOut, remarks }) {

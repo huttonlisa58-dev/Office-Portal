@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { initials } from '@/lib/format';
 import { notifications, punch, computeDay } from '@/lib/db';
+import SelfieModal from '@/components/SelfieModal';
 
 function fmtHMS(totalSec) {
   const s = Math.max(0, Math.floor(totalSec));
@@ -55,28 +56,40 @@ function CheckInOut() {
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     );
   });
-  const doPunch = async () => {
+  const [selfieOpen, setSelfieOpen] = useState(false);
+  const finishPunch = async (selfieBlob) => {
     setBusy(true);
-    try { const geo = await getGeo(); await punch.toggle(companyId, employeeId, day.open ? 'OUT' : 'IN', geo); await refresh(); }
-    catch (e) { alert(e.message || 'Could not record attendance'); }
+    try {
+      const geo = await getGeo();
+      await punch.toggle(companyId, employeeId, day.open ? 'OUT' : 'IN', geo, selfieBlob || null);
+      setSelfieOpen(false);
+      await refresh();
+    } catch (e) { alert(e.message || 'Could not record attendance'); }
     finally { setBusy(false); }
   };
+  const doPunch = () => setSelfieOpen(true);
 
   if (day.open) {
     return (
+      <>
       <button onClick={doPunch} disabled={busy}
         className="flex items-center gap-2 rounded-full border-2 border-sky-500 bg-sky-50 px-3 py-1.5 text-sm font-bold tracking-wide sm:px-4 text-sky-700 transition hover:bg-sky-100 disabled:opacity-60 dark:bg-sky-950/40 dark:text-sky-300" title="Tap to check out">
         <span className="tabular-nums">{fmtHMS(day.openInAt ? (now - new Date(day.openInAt).getTime()) / 1000 : 0)}</span>
         <span className="text-xs">{busy ? '…' : 'CHECK OUT'}</span>
       </button>
+      {selfieOpen && <SelfieModal busy={busy} onCapture={finishPunch} onSkip={() => finishPunch(null)} onClose={() => !busy && setSelfieOpen(false)} />}
+      </>
     );
   }
   return (
+    <>
     <button onClick={doPunch} disabled={busy}
       className="flex items-center gap-2 rounded-full bg-sky-500 px-3 py-1.5 text-sm font-bold tracking-wide sm:px-4 text-white transition hover:bg-sky-600 disabled:opacity-60" title="Tap to check in">
       <LogIn size={15} /> {busy ? '…' : 'CHECK IN'}
       {day.count > 0 && <span className="rounded bg-white/20 px-1.5 text-xs tabular-nums">{fmtHMS(day.workMs / 1000)}</span>}
     </button>
+    {selfieOpen && <SelfieModal busy={busy} onCapture={finishPunch} onSkip={() => finishPunch(null)} onClose={() => !busy && setSelfieOpen(false)} />}
+    </>
   );
 }
 
