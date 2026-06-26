@@ -633,7 +633,7 @@ export const shiftRequests = {
 // ---------- attendance regularization requests ----------
 const mAttReq = (r) => ({
   _id: r.id, date: r.work_date, checkIn: r.check_in, checkOut: r.check_out,
-  remarks: r.remarks, status: r.status, createdAt: r.created_at, employee: mEmpRef(r.employee),
+  remarks: r.remarks, status: r.status, createdAt: r.created_at, employeeId: r.employee_id, employee: mEmpRef(r.employee),
 });
 export const attendanceReq = {
   async create({ companyId, employeeId, date, checkIn, checkOut, remarks }) {

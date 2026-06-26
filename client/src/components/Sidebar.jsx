@@ -26,6 +26,7 @@ const NAV = [
   { label: 'Attendance tracker', icon: CalendarCheck, children: [
     { href: '/attendance', label: 'My attendance' },
     { href: '/attendance/shift', label: 'My shift' },
+    { href: '/attendance/regularize', label: 'Regularization' },
     { href: '/reports', label: 'Reports' },
   ] },
   { label: 'Leave tracker', icon: Plane, children: [
