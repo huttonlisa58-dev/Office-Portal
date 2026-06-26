@@ -38,6 +38,7 @@ const NAV = [
     { href: '/leaves/encashment', label: 'Leave encashment' },
   ] },
   { label: 'Performance management', icon: Activity, children: [
+    { href: '/projects', label: 'Projects' },
     { href: '/tasks', label: 'Tasks & goals' },
     { href: '/performance', label: 'Appraisals' },
   ] },

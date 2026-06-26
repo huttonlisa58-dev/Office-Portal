@@ -559,22 +559,56 @@ export const salaryRevisions = {
 // ---------- tasks ----------
 export const tasks = {
   async list() {
-    const [{ data: rows }, emps] = await Promise.all([
+    const [{ data: rows }, { data: projs }, emps] = await Promise.all([
       supabase.from('tasks').select('*').order('created_at', { ascending: false }),
+      supabase.from('projects').select('id,name'),
       employees.all(),
     ]);
     const byId = Object.fromEntries(emps.map((e) => [e._id, e]));
+    const projById = Object.fromEntries((projs || []).map((p) => [p.id, p.name]));
     return (rows || []).map((t) => ({
       _id: t.id, title: t.title, description: t.description, status: t.status,
-      priority: t.priority, dueDate: t.due_date,
+      priority: t.priority, dueDate: t.due_date, projectId: t.project_id, projectName: t.project_id ? projById[t.project_id] || null : null,
       assignees: (t.assignees || []).map((id) => byId[id]).filter(Boolean),
     }));
   },
-  create: async ({ company_id, created_by, title, description, priority, dueDate, assignees }) => {
-    const { error } = await supabase.from('tasks').insert({ company_id, created_by, title, description, priority, due_date: dueDate || null, assignees: assignees || [] });
+  create: async ({ company_id, created_by, title, description, priority, dueDate, assignees, projectId }) => {
+    const { error } = await supabase.from('tasks').insert({ company_id, created_by, title, description, priority, due_date: dueDate || null, assignees: assignees || [], project_id: projectId || null });
     if (error) throw new Error(error.message);
   },
   advance: async (id, status) => { const patch = { status }; if (status === 'DONE') patch.progress = 100; const { error } = await supabase.from('tasks').update(patch).eq('id', id); if (error) throw new Error(error.message); },
+};
+
+export const projects = {
+  async list() {
+    const [{ data: rows }, { data: tks }, emps] = await Promise.all([
+      supabase.from('projects').select('*').order('created_at', { ascending: false }),
+      supabase.from('tasks').select('id,project_id,assignees,status'),
+      employees.all(),
+    ]);
+    const byId = Object.fromEntries(emps.map((e) => [e._id, e]));
+    const tasksByProj = {};
+    (tks || []).forEach((t) => { if (t.project_id) (tasksByProj[t.project_id] = tasksByProj[t.project_id] || []).push(t); });
+    return (rows || []).map((p) => {
+      const pt = tasksByProj[p.id] || [];
+      const contributorIds = [...new Set(pt.flatMap((t) => t.assignees || []))]; // distinct — no duplication
+      return {
+        _id: p.id, name: p.name, description: p.description, status: p.status || 'ACTIVE',
+        owner: p.owner_id ? byId[p.owner_id] || null : null, ownerId: p.owner_id,
+        taskCount: pt.length, doneCount: pt.filter((t) => t.status === 'DONE').length,
+        contributors: contributorIds.map((id) => byId[id]).filter(Boolean),
+      };
+    });
+  },
+  create: async ({ company_id, name, description, ownerId, status }) => {
+    const { error } = await supabase.from('projects').insert({ company_id, name, description: description || null, owner_id: ownerId || null, status: status || 'ACTIVE' });
+    if (error) throw new Error(error.message);
+  },
+  update: async (id, { name, description, ownerId, status }) => {
+    const { error } = await supabase.from('projects').update({ name, description: description || null, owner_id: ownerId || null, status }).eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+  remove: async (id) => { const { error } = await supabase.from('projects').delete().eq('id', id); if (error) throw new Error(error.message); },
 };
 
 // ---------- companies (super admin) ----------

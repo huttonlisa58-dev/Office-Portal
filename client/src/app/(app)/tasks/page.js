@@ -6,7 +6,7 @@ import Loader from '@/components/Loader';
 import Modal from '@/components/Modal';
 import { EmptyState } from '@/components/ui';
 import { useAuth } from '@/context/AuthContext';
-import { tasks as taskApi, employees as empApi } from '@/lib/db';
+import { tasks as taskApi, employees as empApi, projects as projApi } from '@/lib/db';
 
 const COLUMNS = [
   { key: 'TODO', label: 'To do' },
@@ -58,6 +58,7 @@ export default function TasksPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="font-medium leading-snug">{t.title}</div>
                         {t.priority && <span className={`badge ${PRIORITY[t.priority] || PRIORITY.MEDIUM}`}>{t.priority}</span>}
+                        {t.projectName && <span className="badge bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300">{t.projectName}</span>}
                       </div>
                       {t.description && <p className="mt-1 text-xs text-slate-500 line-clamp-2">{t.description}</p>}
                       <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
@@ -91,17 +92,18 @@ export default function TasksPage() {
 function CreateTask({ onClose, onSaved }) {
   const { user } = useAuth();
   const [employees, setEmployees] = useState([]);
-  const [form, setForm] = useState({ title: '', description: '', priority: 'MEDIUM', dueDate: '', assignees: [] });
+  const [projects, setProjects] = useState([]);
+  const [form, setForm] = useState({ title: '', description: '', priority: 'MEDIUM', dueDate: '', assignees: [], projectId: '' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  useEffect(() => { empApi.list({ limit: 100 }).then((r) => setEmployees(r.items)).catch(() => {}); }, []);
+  useEffect(() => { empApi.list({ limit: 100 }).then((r) => setEmployees(r.items)).catch(() => {}); projApi.list().then(setProjects).catch(() => {}); }, []);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const save = async () => {
     setBusy(true); setErr('');
     try {
-      await taskApi.create({ company_id: user.company, created_by: user.id, title: form.title, description: form.description, priority: form.priority, dueDate: form.dueDate || null, assignees: form.assignees });
+      await taskApi.create({ company_id: user.company, created_by: user.id, title: form.title, description: form.description, priority: form.priority, dueDate: form.dueDate || null, assignees: form.assignees, projectId: form.projectId || null });
       onSaved();
     } catch (e) { setErr(e.message || 'Could not create task'); }
     finally { setBusy(false); }
@@ -119,6 +121,9 @@ function CreateTask({ onClose, onSaved }) {
             <select className="input" value={form.priority} onChange={set('priority')}>{['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((p) => <option key={p}>{p}</option>)}</select>
           </div>
           <div><label className="label">Due date</label><input className="input" type="date" value={form.dueDate} onChange={set('dueDate')} /></div>
+        </div>
+        <div><label className="label">Project</label>
+          <select className="input" value={form.projectId} onChange={set('projectId')}><option value="">— none —</option>{projects.map((p) => <option key={p._id} value={p._id}>{p.name}</option>)}</select>
         </div>
         <div>
           <label className="label">Assignees</label>
