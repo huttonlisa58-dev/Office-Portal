@@ -31,6 +31,7 @@ function CheckInOut() {
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [selfieOpen, setSelfieOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!employeeId) { setLoaded(true); return; }
@@ -56,7 +57,6 @@ function CheckInOut() {
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     );
   });
-  const [selfieOpen, setSelfieOpen] = useState(false);
   const finishPunch = async (selfieBlob) => {
     setBusy(true);
     try {
