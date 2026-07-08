@@ -156,7 +156,7 @@ export const employees = {
   async getOne(id) {
     if (!id) return null;
     const { data } = await supabase.from('employees')
-      .select('*, department:departments(name), designation:designations(title), manager:employees!employees_manager_id_fkey(first_name,last_name,employee_code)')
+      .select('*, department:departments(name), designation:designations(title), account:profiles!fk_profiles_employee(role), manager:employees!employees_manager_id_fkey(first_name,last_name,employee_code)')
       .eq('id', id).maybeSingle();
     if (!data) return null;
     return {
@@ -179,6 +179,13 @@ export const employees = {
       .select('*, department:departments(name), designation:designations(title)').single();
     if (error) throw new Error(error.message);
     return mEmp(data);
+  },
+  // Change an employee's access role (EMPLOYEE / MANAGER / HR). Goes through a guarded RPC
+  // because role lives in profiles and is HR/admin-only.
+  async setRole(employeeId, role) {
+    const { data, error } = await supabase.rpc('set_employee_role', { p_employee_id: employeeId, p_role: role });
+    if (error) throw new Error(error.message);
+    return data;
   },
   async orgData() {
     const { data } = await supabase.from('employees')

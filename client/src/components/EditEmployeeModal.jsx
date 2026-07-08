@@ -19,6 +19,7 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
   const [form, setForm] = useState({});
   const [depts, setDepts] = useState([]); const [desigs, setDesigs] = useState([]); const [mgrs, setMgrs] = useState([]); const [shiftOpts, setShiftOpts] = useState([]);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(false);
+  const [origRole, setOrigRole] = useState('EMPLOYEE');
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   useEffect(() => {
@@ -34,12 +35,14 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
         maritalStatus: e.maritalStatus || '', smoker: e.smoker ? 'Yes' : 'No', address: e.address || '',
         employmentType: e.employmentType || 'FULL_TIME', status: e.status || 'ACTIVE',
         dateOfJoining: e.dateOfJoining || '', deptId: e.departmentId || '', desigId: e.designationId || '', managerId: '',
+        role: e.role || 'EMPLOYEE',
         shiftId: e.shiftId || '', weeklyOff: e.weeklyOff ?? '',
         pan: e.pan || '', uan: e.uan || '', pfNumber: e.pfNumber || '', esiNumber: e.esiNumber || '',
         accessUntil: e.accessUntil || '',
         band: e.band || '', division: e.division || '',
         bankAccountName: e.bankAccountName || '', bankAccountNumber: e.bankAccountNumber || '', bankIfsc: e.bankIfsc || '', bankName: e.bankName || '',
       });
+      setOrigRole(e.role || 'EMPLOYEE');
     }).catch(() => {}).finally(() => setLoading(false));
   }, [emp]);
 
@@ -60,6 +63,11 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
         bank_account_name: form.bankAccountName || null, bank_account_number: form.bankAccountNumber || null, bank_ifsc: form.bankIfsc || null, bank_name: form.bankName || null,
         ...(form.managerId ? { manager_id: form.managerId } : {}),
       });
+
+      // Role change goes through the guarded RPC (role lives in profiles, not the employees table).
+      if (form.role && form.role !== origRole) {
+        await empApi.setRole(emp._id, form.role);
+      }
 
       // Email / password go through the auth-aware edge function so the login stays in sync.
       const newEmail = (form.email || '').trim();
@@ -112,6 +120,7 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
           <Fld label="Department"><select className="input" value={form.deptId || ''} onChange={set('deptId')}><option value="">—</option>{depts.map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}</select></Fld>
           <Fld label="Designation"><select className="input" value={form.desigId || ''} onChange={set('desigId')}><option value="">—</option>{desigs.map((d) => <option key={d._id} value={d._id}>{d.title}</option>)}</select></Fld>
           <Fld label="Reporting manager"><select className="input" value={form.managerId || ''} onChange={set('managerId')}><option value="">— keep current —</option>{mgrs.filter((m) => m._id !== emp?._id).map((m) => <option key={m._id} value={m._id}>{m.firstName} {m.lastName} ({m.employeeId})</option>)}</select></Fld>
+          <Fld label="Role (access level)"><select className="input" value={form.role || 'EMPLOYEE'} onChange={set('role')}><option value="EMPLOYEE">Employee</option><option value="MANAGER">Manager (can approve their team)</option><option value="HR">HR</option></select></Fld>
           <Fld label="Date of joining"><input className="input" type="date" value={form.dateOfJoining || ''} onChange={set('dateOfJoining')} /></Fld>
           <Fld label="Employment type"><select className="input" value={form.employmentType || 'FULL_TIME'} onChange={set('employmentType')}>{EMP_TYPES.map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}</select></Fld>
           <Fld label="Employee status"><select className="input" value={form.status || 'ACTIVE'} onChange={set('status')}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></Fld>
