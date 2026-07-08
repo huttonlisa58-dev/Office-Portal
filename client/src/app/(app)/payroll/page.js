@@ -236,7 +236,7 @@ function GeneratePayroll({ onClose, onSaved }) {
           <div><label className="label">Bonus</label><input className="input" type="number" value={form.bonus} onChange={set('bonus')} /></div>
           <div><label className="label">Loss-of-pay days</label><input className="input" type="number" value={form.lopDays} onChange={set('lopDays')} /></div>
         </div>
-        <p className="text-xs text-slate-400">Tax is computed from the employee's salary-structure slabs. Set a structure first if none exists.</p>
+        <p className="text-xs text-slate-400">Tax is computed from the employee&apos;s salary-structure slabs. Set a structure first if none exists.</p>
       </div>
     </Modal>
   );

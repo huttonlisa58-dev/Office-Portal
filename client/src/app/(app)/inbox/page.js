@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Mail, Calendar, DollarSign, FileText, Clock, Receipt, ShieldCheck, Package,
   Users, UserCog, Settings, Check, X, Inbox as InboxIcon, CalendarCheck,
@@ -42,6 +42,15 @@ export default function InboxPage() {
   const canDecide = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR', 'MANAGER'].includes(user?.role);
   const [module, setModule] = useState('leaves');
   const [tab, setTab] = useState('mine');
+  // Approvers should land on "Awaiting approval" (the requests they must act on),
+  // not "My requests" — which is empty for admin/HR accounts with no employee record.
+  const tabInit = useRef(false);
+  useEffect(() => {
+    if (!tabInit.current && user) {
+      tabInit.current = true;
+      if (['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR', 'MANAGER'].includes(user.role)) setTab('await');
+    }
+  }, [user]);
   const [leaves, setLeaves] = useState([]);
   const [att, setAtt] = useState([]);
   const [loading, setLoading] = useState(true);

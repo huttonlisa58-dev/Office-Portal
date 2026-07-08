@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Building2, Layers, Briefcase, Clock, Trash2, Plus, Users, CalendarClock } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import Loader from '@/components/Loader';
@@ -26,6 +26,8 @@ export default function SettingsPage() {
   const [newDesig, setNewDesig] = useState('');
   const [work, setWork] = useState({ workdayStart: '09:00', lateAfterMinutes: 15, fullDayHours: 8 });
   const [savedMsg, setSavedMsg] = useState('');
+  const savedTimer = useRef(null);
+  useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -105,7 +107,9 @@ export default function SettingsPage() {
       full_day_hours: Number(work.fullDayHours),
     }).eq('id', companyId);
     if (error) { setSavedMsg(error.message); return; }
-    setSavedMsg('Work settings saved.'); refresh?.(); setTimeout(() => setSavedMsg(''), 3000);
+    setSavedMsg('Work settings saved.'); refresh?.();
+    if (savedTimer.current) clearTimeout(savedTimer.current);
+    savedTimer.current = setTimeout(() => setSavedMsg(''), 3000);
   };
 
   if (loading) return <Loader />;

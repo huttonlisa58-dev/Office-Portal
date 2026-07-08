@@ -356,13 +356,13 @@ export const attendance = {
 // ---------- leaves ----------
 export const leaves = {
   async list() {
-    const { data } = await supabase.from('leaves').select('*, employee:employees!leaves_employee_id_fkey(first_name,last_name,employee_code,location,designation:designations(title)), decider:employees!leaves_approver_id_fkey(first_name,last_name,employee_code)').order('created_at', { ascending: false });
+    const { data } = await supabase.from('leaves').select('*, employee:employees!leaves_employee_id_fkey(first_name,last_name,employee_code,designation:designations(title)), decider:employees!leaves_approver_id_fkey(first_name,last_name,employee_code)').order('created_at', { ascending: false });
     return (data || []).map(mLeave);
   },
   async mine(employeeId) {
     if (!employeeId) return [];
     const { data } = await supabase.from('leaves')
-      .select('*, employee:employees!leaves_employee_id_fkey(first_name,last_name,employee_code,location,designation:designations(title)), decider:employees!leaves_approver_id_fkey(first_name,last_name,employee_code)')
+      .select('*, employee:employees!leaves_employee_id_fkey(first_name,last_name,employee_code,designation:designations(title)), decider:employees!leaves_approver_id_fkey(first_name,last_name,employee_code)')
       .eq('employee_id', employeeId).order('created_at', { ascending: false });
     return (data || []).map(mLeave);
   },
@@ -1023,7 +1023,17 @@ export function computeDay(punches, nowMs = Date.now()) {
     }
   }
   const open = Boolean(openInAt);
-  if (open) { workMs += nowMs - new Date(openInAt).getTime(); sessions.push({ in: openInAt, out: null }); }
+  if (open) {
+    // Cap an unclosed session at the end of ITS OWN day, not "now".
+    // Without this, a past day with a dangling check-in balloons to (now - checkIn),
+    // e.g. a 12-day-old open punch showed as 302:21:00. Today's live session is unaffected
+    // because end-of-today is still in the future, so nowMs wins.
+    const inMs = new Date(openInAt).getTime();
+    const endOfInDay = new Date(openInAt); endOfInDay.setHours(23, 59, 59, 999);
+    const capMs = Math.min(nowMs, endOfInDay.getTime());
+    workMs += Math.max(0, capMs - inMs);
+    sessions.push({ in: openInAt, out: null });
+  }
   return { workMs, breakMs, open, openInAt, lastOutAt, sessions, count: sorted.length };
 }
 
