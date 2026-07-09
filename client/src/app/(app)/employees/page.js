@@ -203,12 +203,15 @@ function AddEmployee({ open, onClose, user, onDone }) {
     phone: '', gender: '', dob: '', bloodGroup: '', maritalStatus: '', smoker: 'No', address: '',
     employmentType: 'FULL_TIME', status: 'ACTIVE', dateOfJoining: '',
     role: 'EMPLOYEE', shiftId: '', weeklyOff: '', accessUntil: '', band: '', division: '',
+    workLocationId: '', personalEmail: '', homePhone: '', communicationAddress: '',
+    city: '', state: '', country: '', postalCode: '',
     pan: '', uan: '', pfNumber: '', esiNumber: '',
     bankAccountName: '', bankAccountNumber: '', bankIfsc: '', bankName: '',
   };
   const [form, setForm] = useState(empty);
   const [depts, setDepts] = useState([]); const [desigs, setDesigs] = useState([]); const [mgrs, setMgrs] = useState([]);
   const [shifts, setShifts] = useState([]);
+  const [locs, setLocs] = useState([]);
   // Uppercase-only identifiers — typing them in lowercase is the most common data-entry slip.
   const setUpper = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value.toUpperCase() }));
   // The account holder is almost always the employee. Offer it, don't force it.
@@ -223,6 +226,7 @@ function AddEmployee({ open, onClose, user, onDone }) {
     if (open) {
       org.departments().then(setDepts); org.designations().then(setDesigs); empApi.all().then(setMgrs).catch(() => {});
       shiftApi.list().then(setShifts).catch(() => {});
+      org.officeLocations().then(setLocs).catch(() => {});
       // Most hires are entered on their joining day; pre-fill it but leave it editable.
       setForm((f) => (f.dateOfJoining ? f : { ...f, dateOfJoining: new Date().toISOString().slice(0, 10) }));
       setCreated(null); setErr('');
@@ -234,6 +238,7 @@ function AddEmployee({ open, onClose, user, onDone }) {
     // --- validation: fail fast with a friendly message instead of a raw DB error ---
     if (!form.firstName.trim()) { setErr('First name is required.'); return; }
     if (form.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) { setErr('Enter a valid email address.'); return; }
+    if (form.personalEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.personalEmail.trim())) { setErr('Enter a valid personal email address.'); return; }
     if (form.password && form.password.length < 8) { setErr('Password must be at least 8 characters.'); return; }
     if (form.role !== 'EMPLOYEE' && !form.email.trim()) { setErr('An email is required to give someone a Manager or HR role (they need a login).'); return; }
     if (form.dob && form.dateOfJoining && form.dob >= form.dateOfJoining) { setErr('Date of birth must be before the date of joining.'); return; }
@@ -253,6 +258,10 @@ function AddEmployee({ open, onClose, user, onDone }) {
         employment_type: form.employmentType, status: form.status,
         shift_id: form.shiftId || null, weekly_off: form.weeklyOff === '' ? null : Number(form.weeklyOff),
         access_until: form.accessUntil || null, band: form.band || null, division: form.division || null,
+        work_location_id: form.workLocationId || null,
+        personal_email: form.personalEmail || null, home_phone: form.homePhone || null,
+        communication_address: form.communicationAddress || null,
+        city: form.city || null, state: form.state || null, country: form.country || null, postal_code: form.postalCode || null,
         pan: form.pan || null, uan: form.uan || null, pf_number: form.pfNumber || null, esi_number: form.esiNumber || null,
         bank_account_name: form.bankAccountName || null, bank_account_number: form.bankAccountNumber || null,
         bank_ifsc: form.bankIfsc || null, bank_name: form.bankName || null,
@@ -303,8 +312,17 @@ function AddEmployee({ open, onClose, user, onDone }) {
             <Fld label="Marital status"><select className="input" value={form.maritalStatus} onChange={set('maritalStatus')}><option value="">—</option>{MARITALS.map((m) => <option key={m} value={m}>{m}</option>)}</select></Fld>
             <Fld label="Smoker"><select className="input" value={form.smoker} onChange={set('smoker')}><option>No</option><option>Yes</option></select></Fld>
             <Fld label="Phone"><input className="input" value={form.phone} onChange={set('phone')} placeholder="+91 98765 43210" /></Fld>
+            <Fld label="Personal email"><input className="input" type="email" value={form.personalEmail} onChange={set('personalEmail')} placeholder="Used after they leave" /></Fld>
+            <Fld label="Home phone"><input className="input" value={form.homePhone} onChange={set('homePhone')} /></Fld>
           </div>
           <Fld label="Address"><textarea className="input" rows={2} value={form.address} onChange={set('address')} placeholder="House / street, city, state, PIN" /></Fld>
+          <Fld label="Communication address"><textarea className="input" rows={2} value={form.communicationAddress} onChange={set('communicationAddress')} placeholder="Leave blank if same as above" /></Fld>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Fld label="City"><input className="input" value={form.city} onChange={set('city')} /></Fld>
+            <Fld label="State"><input className="input" value={form.state} onChange={set('state')} /></Fld>
+            <Fld label="Country"><input className="input" value={form.country} onChange={set('country')} placeholder="India" /></Fld>
+            <Fld label="Postal code"><input className="input" value={form.postalCode} onChange={set('postalCode')} inputMode="numeric" placeholder="203131" /></Fld>
+          </div>
 
           <SectionLabel>Work</SectionLabel>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -318,6 +336,7 @@ function AddEmployee({ open, onClose, user, onDone }) {
             <Fld label="Weekly off"><select className="input" value={form.weeklyOff} onChange={set('weeklyOff')}><option value="">—</option><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></Fld>
             <Fld label="Band / grade"><input className="input" value={form.band} onChange={set('band')} placeholder="e.g. B2" /></Fld>
             <Fld label="Division"><input className="input" value={form.division} onChange={set('division')} placeholder="e.g. Operations" /></Fld>
+            <Fld label="Work location"><select className="input" value={form.workLocationId} onChange={set('workLocationId')}><option value="">—</option>{locs.map((l) => <option key={l._id} value={l._id}>{l.name}</option>)}</select></Fld>
           </div>
           <div>
             <Fld label="Role (access level)"><select className="input" value={form.role} onChange={set('role')}><option value="EMPLOYEE">Employee</option><option value="MANAGER">Manager</option><option value="HR">HR</option></select></Fld>
