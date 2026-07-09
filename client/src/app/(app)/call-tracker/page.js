@@ -76,7 +76,11 @@ function CallModal({ onClose, onDone, companyId, employeeId }) {
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const save = async () => {
-    setErr(''); setBusy(true);
+    setErr('');
+    if (!form.contactNumber?.trim()) { setErr('Contact number is required.'); return; }
+    if (!/^[+0-9][0-9\s-]{5,19}$/.test(form.contactNumber.trim())) { setErr('Enter a valid contact number.'); return; }
+    if (form.durationMin !== '' && form.durationMin != null && Number(form.durationMin) < 0) { setErr('Duration cannot be negative.'); return; }
+    setBusy(true);
     try { await api.create({ companyId, employeeId, ...form }); onDone(); }
     catch (e) { setErr(e.message || 'Could not save'); } finally { setBusy(false); }
   };

@@ -18,6 +18,7 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
   const open = !!emp;
   const [form, setForm] = useState({});
   const [depts, setDepts] = useState([]); const [desigs, setDesigs] = useState([]); const [mgrs, setMgrs] = useState([]); const [shiftOpts, setShiftOpts] = useState([]);
+  const [locs, setLocs] = useState([]);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false); const [loading, setLoading] = useState(false);
   const [origRole, setOrigRole] = useState('EMPLOYEE');
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -26,6 +27,7 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
     if (!emp) return;
     setErr(''); setLoading(true);
     org.departments().then(setDepts); org.designations().then(setDesigs); empApi.all().then(setMgrs).catch(() => {}); shiftApi.list().then(setShiftOpts).catch(() => {});
+    org.officeLocations().then(setLocs).catch(() => {});
     empApi.getOne(emp._id).then((d) => {
       const e = d || emp;
       setForm({
@@ -41,6 +43,13 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
         accessUntil: e.accessUntil || '',
         band: e.band || '', division: e.division || '',
         bankAccountName: e.bankAccountName || '', bankAccountNumber: e.bankAccountNumber || '', bankIfsc: e.bankIfsc || '', bankName: e.bankName || '',
+        fatherName: e.fatherName || '', motherName: e.motherName || '', nationality: e.nationality || '', religion: e.religion || '',
+        aadhaar: e.aadhaar || '', physicallyChallenged: e.physicallyChallenged ? 'Yes' : 'No',
+        probationEndDate: e.probationEndDate || '', confirmationDate: e.confirmationDate || '',
+        noticePeriodDays: e.noticePeriodDays ?? '', exitDate: e.exitDate || '',
+        workLocationId: e.workLocationId || '',
+        personalEmail: e.personalEmail || '', homePhone: e.homePhone || '', communicationAddress: e.communicationAddress || '',
+        city: e.city || '', state: e.state || '', country: e.country || '', postalCode: e.postalCode || '',
       });
       setOrigRole(e.role || 'EMPLOYEE');
     }).catch(() => {}).finally(() => setLoading(false));
@@ -52,6 +61,11 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
     if (form.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) { setErr('Enter a valid email address.'); return; }
     if (form.password && form.password.length < 8) { setErr('Password must be at least 8 characters.'); return; }
     if (form.dob && form.dateOfJoining && form.dob >= form.dateOfJoining) { setErr('Date of birth must be before the date of joining.'); return; }
+    if (form.personalEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.personalEmail.trim())) { setErr('Enter a valid personal email address.'); return; }
+    if (form.pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(form.pan)) { setErr('PAN should look like ABCDE1234F.'); return; }
+    if (form.bankIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.bankIfsc)) { setErr('IFSC should look like HDFC0001234.'); return; }
+    if (form.aadhaar && !/^\d{12}$/.test(form.aadhaar.replace(/\s/g, ''))) { setErr('Aadhaar must be 12 digits.'); return; }
+    if (form.noticePeriodDays !== '' && form.noticePeriodDays != null && (Number(form.noticePeriodDays) < 0 || Number(form.noticePeriodDays) > 365)) { setErr('Notice period must be between 0 and 365 days.'); return; }
     setBusy(true);
     try {
       await empApi.update(emp._id, {
@@ -66,6 +80,17 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
         access_until: form.accessUntil || null,
         band: form.band || null, division: form.division || null,
         bank_account_name: form.bankAccountName || null, bank_account_number: form.bankAccountNumber || null, bank_ifsc: form.bankIfsc || null, bank_name: form.bankName || null,
+        father_name: form.fatherName || null, mother_name: form.motherName || null,
+        nationality: form.nationality || null, religion: form.religion || null,
+        aadhaar: form.aadhaar ? form.aadhaar.replace(/\s/g, '') : null,
+        physically_challenged: form.physicallyChallenged === 'Yes',
+        probation_end_date: form.probationEndDate || null, confirmation_date: form.confirmationDate || null,
+        notice_period_days: form.noticePeriodDays === '' ? null : Number(form.noticePeriodDays),
+        exit_date: form.exitDate || null,
+        work_location_id: form.workLocationId || null,
+        personal_email: form.personalEmail || null, home_phone: form.homePhone || null,
+        communication_address: form.communicationAddress || null,
+        city: form.city || null, state: form.state || null, country: form.country || null, postal_code: form.postalCode || null,
         ...(form.managerId ? { manager_id: form.managerId } : {}),
       });
 
@@ -117,8 +142,21 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
           <Fld label="Blood group"><select className="input" value={form.bloodGroup || ''} onChange={set('bloodGroup')}><option value="">—</option>{BLOODS.map((b) => <option key={b} value={b}>{b}</option>)}</select></Fld>
           <Fld label="Marital status"><select className="input" value={form.maritalStatus || ''} onChange={set('maritalStatus')}><option value="">—</option>{MARITALS.map((m) => <option key={m} value={m}>{m}</option>)}</select></Fld>
           <Fld label="Smoker"><select className="input" value={form.smoker || 'No'} onChange={set('smoker')}><option>No</option><option>Yes</option></select></Fld>
+          <Fld label="Father&apos;s name"><input className="input" value={form.fatherName || ''} onChange={set('fatherName')} /></Fld>
+          <Fld label="Mother&apos;s name"><input className="input" value={form.motherName || ''} onChange={set('motherName')} /></Fld>
+          <Fld label="Nationality"><input className="input" value={form.nationality || ''} onChange={set('nationality')} placeholder="Indian" /></Fld>
+          <Fld label="Religion"><input className="input" value={form.religion || ''} onChange={set('religion')} /></Fld>
+          <Fld label="Aadhaar"><input className="input" value={form.aadhaar || ''} onChange={set('aadhaar')} placeholder="12 digits" inputMode="numeric" maxLength={12} /></Fld>
+          <Fld label="Physically challenged"><select className="input" value={form.physicallyChallenged || 'No'} onChange={set('physicallyChallenged')}><option>No</option><option>Yes</option></select></Fld>
+          <Fld label="Personal email"><input className="input" type="email" value={form.personalEmail || ''} onChange={set('personalEmail')} /></Fld>
+          <Fld label="Home phone"><input className="input" value={form.homePhone || ''} onChange={set('homePhone')} /></Fld>
+          <Fld label="City"><input className="input" value={form.city || ''} onChange={set('city')} /></Fld>
+          <Fld label="State"><input className="input" value={form.state || ''} onChange={set('state')} /></Fld>
+          <Fld label="Country"><input className="input" value={form.country || ''} onChange={set('country')} /></Fld>
+          <Fld label="Postal code"><input className="input" value={form.postalCode || ''} onChange={set('postalCode')} inputMode="numeric" /></Fld>
         </div>
         <Fld label="Address"><textarea className="input" rows={2} value={form.address || ''} onChange={set('address')} /></Fld>
+        <Fld label="Communication address"><textarea className="input" rows={2} value={form.communicationAddress || ''} onChange={set('communicationAddress')} placeholder="Leave blank if same as above" /></Fld>
 
         <SectionLabel>Work</SectionLabel>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -134,6 +172,11 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
           <Fld label="Portal access until"><input type="date" className="input" value={form.accessUntil || ''} onChange={set('accessUntil')} /></Fld>
           <Fld label="Band / grade"><input className="input" value={form.band} onChange={set('band')} placeholder="e.g. B2" /></Fld>
           <Fld label="Division"><input className="input" value={form.division} onChange={set('division')} placeholder="e.g. Operations" /></Fld>
+          <Fld label="Work location"><select className="input" value={form.workLocationId || ''} onChange={set('workLocationId')}><option value="">—</option>{locs.map((l) => <option key={l._id} value={l._id}>{l.name}</option>)}</select></Fld>
+          <Fld label="Probation ends"><input type="date" className="input" value={form.probationEndDate || ''} onChange={set('probationEndDate')} /></Fld>
+          <Fld label="Confirmation date"><input type="date" className="input" value={form.confirmationDate || ''} onChange={set('confirmationDate')} /></Fld>
+          <Fld label="Notice period (days)"><input className="input" value={form.noticePeriodDays ?? ''} onChange={set('noticePeriodDays')} inputMode="numeric" placeholder="e.g. 30" /></Fld>
+          <Fld label="Exit date"><input type="date" className="input" value={form.exitDate || ''} onChange={set('exitDate')} /></Fld>
         </div>
 
         <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Statutory &amp; bank details</p>
