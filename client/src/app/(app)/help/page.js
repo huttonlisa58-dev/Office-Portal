@@ -10,7 +10,7 @@ const FAQS = [
   { q: 'Where can I see my shift / roster?', a: 'Go to Attendance tracker → My shift. The monthly calendar shows each day\u2019s shift timing and your weekly off (Day off).' },
   { q: 'How do I pull reports?', a: 'Open the Reports section — My Check-in/Check-out, Entry/Exit and My leave summary are available. Change the month to view data for a different period.' },
   { q: 'Where is my full profile?', a: 'Top-right avatar → My Profile, then "View full details". You\u2019ll find Primary information, Work information and the other sections there.' },
-  { q: 'How do I add a new employee? (HR/Admin)', a: 'Go to Employees → "Add employee". Fill in the Basic, Personal and Work details. Adding an email automatically creates a login (default password Welcome@123).' },
+  { q: 'How do I add a new employee? (HR/Admin)', a: 'Go to Employees → "Add employee". Fill in the Basic, Personal and Work details. Adding an email automatically creates a login — leave the password blank and a strong one is generated and shown to you once, right after you save.' },
   { q: 'How do I change my password?', a: 'Your first login uses the default password. You can reset your password from Settings or through your account provider. HR can also set a temporary password for you.' },
 ];
 

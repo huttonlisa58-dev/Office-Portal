@@ -209,6 +209,12 @@ function AddEmployee({ open, onClose, user, onDone }) {
   const [form, setForm] = useState(empty);
   const [depts, setDepts] = useState([]); const [desigs, setDesigs] = useState([]); const [mgrs, setMgrs] = useState([]);
   const [shifts, setShifts] = useState([]);
+  // Uppercase-only identifiers — typing them in lowercase is the most common data-entry slip.
+  const setUpper = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value.toUpperCase() }));
+  // The account holder is almost always the employee. Offer it, don't force it.
+  const fillHolderFromName = () => setForm((f) => (
+    f.bankAccountName ? f : { ...f, bankAccountName: [f.firstName, f.middleName, f.lastName].filter(Boolean).join(' ').trim() }
+  ));
   const [deptId, setDeptId] = useState(''); const [desigId, setDesigId] = useState(''); const [managerId, setManagerId] = useState('');
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState(null);
@@ -217,6 +223,8 @@ function AddEmployee({ open, onClose, user, onDone }) {
     if (open) {
       org.departments().then(setDepts); org.designations().then(setDesigs); empApi.all().then(setMgrs).catch(() => {});
       shiftApi.list().then(setShifts).catch(() => {});
+      // Most hires are entered on their joining day; pre-fill it but leave it editable.
+      setForm((f) => (f.dateOfJoining ? f : { ...f, dateOfJoining: new Date().toISOString().slice(0, 10) }));
       setCreated(null); setErr('');
     }
   }, [open]);
@@ -229,6 +237,9 @@ function AddEmployee({ open, onClose, user, onDone }) {
     if (form.password && form.password.length < 8) { setErr('Password must be at least 8 characters.'); return; }
     if (form.role !== 'EMPLOYEE' && !form.email.trim()) { setErr('An email is required to give someone a Manager or HR role (they need a login).'); return; }
     if (form.dob && form.dateOfJoining && form.dob >= form.dateOfJoining) { setErr('Date of birth must be before the date of joining.'); return; }
+    if (form.pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(form.pan)) { setErr('PAN should look like ABCDE1234F.'); return; }
+    if (form.bankIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.bankIfsc)) { setErr('IFSC should look like HDFC0001234.'); return; }
+    if (form.bankAccountNumber && !/^\d{6,20}$/.test(form.bankAccountNumber)) { setErr('Bank account number should be 6–20 digits.'); return; }
     setBusy(true);
     try {
       const res = await empApi.create({
@@ -282,7 +293,7 @@ function AddEmployee({ open, onClose, user, onDone }) {
             <Fld label="Nick name"><input className="input" value={form.nickName} onChange={set('nickName')} /></Fld>
           </div>
           <Fld label="Email (login ID)"><input className="input" type="email" value={form.email} onChange={set('email')} placeholder="employee@company.com" /></Fld>
-          <Fld label="Temporary password"><input className="input" value={form.password} onChange={set('password')} placeholder="Defaults to Welcome@123" /><p className="mt-1 text-xs text-slate-400">A login is created automatically from the email. The employee can change it after their first login.</p></Fld>
+          <Fld label="Temporary password"><input className="input" value={form.password} onChange={set('password')} placeholder="Leave blank to generate a strong one" /><p className="mt-1 text-xs text-slate-400">A login is created from the email. Leave this blank and we&apos;ll generate a password and show it once, after you save.</p></Fld>
 
           <SectionLabel>Personal</SectionLabel>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -291,32 +302,47 @@ function AddEmployee({ open, onClose, user, onDone }) {
             <Fld label="Blood group"><select className="input" value={form.bloodGroup} onChange={set('bloodGroup')}><option value="">—</option>{BLOODS.map((b) => <option key={b} value={b}>{b}</option>)}</select></Fld>
             <Fld label="Marital status"><select className="input" value={form.maritalStatus} onChange={set('maritalStatus')}><option value="">—</option>{MARITALS.map((m) => <option key={m} value={m}>{m}</option>)}</select></Fld>
             <Fld label="Smoker"><select className="input" value={form.smoker} onChange={set('smoker')}><option>No</option><option>Yes</option></select></Fld>
-            <Fld label="Phone"><input className="input" value={form.phone} onChange={set('phone')} placeholder="+91…" /></Fld>
+            <Fld label="Phone"><input className="input" value={form.phone} onChange={set('phone')} placeholder="+91 98765 43210" /></Fld>
           </div>
-          <Fld label="Address"><textarea className="input" rows={2} value={form.address} onChange={set('address')} /></Fld>
+          <Fld label="Address"><textarea className="input" rows={2} value={form.address} onChange={set('address')} placeholder="House / street, city, state, PIN" /></Fld>
 
           <SectionLabel>Work</SectionLabel>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Fld label="Department"><select className="input" value={deptId} onChange={(e) => setDeptId(e.target.value)}><option value="">—</option>{depts.map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}</select></Fld>
             <Fld label="Designation"><select className="input" value={desigId} onChange={(e) => setDesigId(e.target.value)}><option value="">—</option>{desigs.map((d) => <option key={d._id} value={d._id}>{d.title}</option>)}</select></Fld>
             <Fld label="Reporting manager"><select className="input" value={managerId} onChange={(e) => setManagerId(e.target.value)}><option value="">—</option>{mgrs.map((m) => <option key={m._id} value={m._id}>{m.firstName} {m.lastName} ({m.employeeId})</option>)}</select></Fld>
-            <Fld label="Role (access level)"><select className="input" value={form.role} onChange={set('role')}><option value="EMPLOYEE">Employee</option><option value="MANAGER">Manager (can approve their team)</option><option value="HR">HR</option></select></Fld>
-            <Fld label="Shift"><select className="input" value={form.shiftId} onChange={set('shiftId')}><option value="">—</option>{shifts.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}</select></Fld>
-            <Fld label="Weekly off"><select className="input" value={form.weeklyOff} onChange={set('weeklyOff')}><option value="">—</option><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></Fld>
-            <Fld label="Portal access until"><input type="date" className="input" value={form.accessUntil} onChange={set('accessUntil')} /></Fld>
-            <Fld label="Band / grade"><input className="input" value={form.band} onChange={set('band')} placeholder="e.g. B2" /></Fld>
-            <Fld label="Division"><input className="input" value={form.division} onChange={set('division')} /></Fld>
-            <Fld label="PAN"><input className="input" value={form.pan} onChange={set('pan')} /></Fld>
-            <Fld label="UAN"><input className="input" value={form.uan} onChange={set('uan')} /></Fld>
-            <Fld label="PF number"><input className="input" value={form.pfNumber} onChange={set('pfNumber')} /></Fld>
-            <Fld label="ESI number"><input className="input" value={form.esiNumber} onChange={set('esiNumber')} /></Fld>
-            <Fld label="Bank account holder"><input className="input" value={form.bankAccountName} onChange={set('bankAccountName')} /></Fld>
-            <Fld label="Bank account number"><input className="input" value={form.bankAccountNumber} onChange={set('bankAccountNumber')} /></Fld>
-            <Fld label="IFSC"><input className="input" value={form.bankIfsc} onChange={set('bankIfsc')} /></Fld>
-            <Fld label="Bank name"><input className="input" value={form.bankName} onChange={set('bankName')} /></Fld>
             <Fld label="Date of joining"><input className="input" type="date" value={form.dateOfJoining} onChange={set('dateOfJoining')} /></Fld>
             <Fld label="Employment type"><select className="input" value={form.employmentType} onChange={set('employmentType')}>{EMP_TYPES.map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}</select></Fld>
             <Fld label="Employee status"><select className="input" value={form.status} onChange={set('status')}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></Fld>
+            <Fld label="Shift"><select className="input" value={form.shiftId} onChange={set('shiftId')}><option value="">—</option>{shifts.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}</select></Fld>
+            <Fld label="Weekly off"><select className="input" value={form.weeklyOff} onChange={set('weeklyOff')}><option value="">—</option><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></Fld>
+            <Fld label="Band / grade"><input className="input" value={form.band} onChange={set('band')} placeholder="e.g. B2" /></Fld>
+            <Fld label="Division"><input className="input" value={form.division} onChange={set('division')} placeholder="e.g. Operations" /></Fld>
+          </div>
+          <div>
+            <Fld label="Role (access level)"><select className="input" value={form.role} onChange={set('role')}><option value="EMPLOYEE">Employee</option><option value="MANAGER">Manager</option><option value="HR">HR</option></select></Fld>
+            <p className="mt-1 text-xs text-slate-400">
+              {form.role === 'EMPLOYEE' && 'Sees only their own attendance, leave and payslips.'}
+              {form.role === 'MANAGER' && 'Also reviews and approves requests from their reporting team.'}
+              {form.role === 'HR' && 'Full people access: adds employees, runs payroll, approves any request.'}
+            </p>
+          </div>
+          <Fld label="Portal access until"><input type="date" className="input" value={form.accessUntil} onChange={set('accessUntil')} /><p className="mt-1 text-xs text-slate-400">Leave blank for permanent access. After this date the employee can&apos;t sign in.</p></Fld>
+
+          <SectionLabel>Statutory</SectionLabel>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Fld label="PAN"><input className="input" value={form.pan} onChange={setUpper('pan')} placeholder="ABCDE1234F" maxLength={10} /></Fld>
+            <Fld label="UAN"><input className="input" value={form.uan} onChange={setUpper('uan')} placeholder="12-digit UAN" inputMode="numeric" /></Fld>
+            <Fld label="PF number"><input className="input" value={form.pfNumber} onChange={setUpper('pfNumber')} /></Fld>
+            <Fld label="ESI number"><input className="input" value={form.esiNumber} onChange={setUpper('esiNumber')} /></Fld>
+          </div>
+
+          <SectionLabel>Bank details</SectionLabel>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Fld label="Account holder"><input className="input" value={form.bankAccountName} onChange={set('bankAccountName')} onFocus={fillHolderFromName} placeholder="As printed on the passbook" /></Fld>
+            <Fld label="Account number"><input className="input" value={form.bankAccountNumber} onChange={set('bankAccountNumber')} inputMode="numeric" /></Fld>
+            <Fld label="IFSC"><input className="input" value={form.bankIfsc} onChange={setUpper('bankIfsc')} placeholder="HDFC0001234" maxLength={11} /></Fld>
+            <Fld label="Bank name"><input className="input" value={form.bankName} onChange={set('bankName')} placeholder="e.g. HDFC Bank" /></Fld>
           </div>
 
           <div className="flex justify-end gap-2 border-t pt-3 dark:border-slate-700">
