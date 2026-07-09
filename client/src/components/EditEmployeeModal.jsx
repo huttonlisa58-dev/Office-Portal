@@ -47,7 +47,12 @@ export default function EditEmployeeModal({ emp, onClose, onDone }) {
   }, [emp]);
 
   const save = async () => {
-    setErr(''); setBusy(true);
+    setErr('');
+    if (!form.firstName?.trim()) { setErr('First name is required.'); return; }
+    if (form.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) { setErr('Enter a valid email address.'); return; }
+    if (form.password && form.password.length < 8) { setErr('Password must be at least 8 characters.'); return; }
+    if (form.dob && form.dateOfJoining && form.dob >= form.dateOfJoining) { setErr('Date of birth must be before the date of joining.'); return; }
+    setBusy(true);
     try {
       await empApi.update(emp._id, {
         first_name: form.firstName, middle_name: form.middleName || null, last_name: form.lastName, nick_name: form.nickName || null,

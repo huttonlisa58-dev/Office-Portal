@@ -101,7 +101,9 @@ function CreateTask({ onClose, onSaved }) {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const save = async () => {
-    setBusy(true); setErr('');
+    setErr('');
+    if (!form.title.trim()) { setErr('Task title is required.'); return; }
+    setBusy(true);
     try {
       await taskApi.create({ company_id: user.company, created_by: user.id, title: form.title, description: form.description, priority: form.priority, dueDate: form.dueDate || null, assignees: form.assignees, projectId: form.projectId || null });
       onSaved();

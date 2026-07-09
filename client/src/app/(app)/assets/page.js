@@ -71,7 +71,9 @@ function AssetModal({ asset, emps, companyId, onClose, onDone }) {
   const [form, setForm] = useState({ name: asset.name || '', tag: asset.tag || '', category: asset.category || '', status: asset.status || 'AVAILABLE', assignedTo: asset.assignedTo || '' });
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const save = async () => {
-    setErr(''); setBusy(true);
+    setErr('');
+    if (!form.name.trim()) { setErr('Asset name is required.'); return; }
+    setBusy(true);
     try {
       const payload = { name: form.name, tag: form.tag || null, category: form.category || null, status: form.status, assigned_to: form.assignedTo || null };
       if (isNew) await api.create({ ...payload, company_id: companyId });

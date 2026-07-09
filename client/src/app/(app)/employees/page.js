@@ -8,7 +8,7 @@ import Modal from '@/components/Modal';
 import EditEmployeeModal from '@/components/EditEmployeeModal';
 import { useAuth } from '@/context/AuthContext';
 import { initials, cls } from '@/lib/format';
-import { employees as empApi, org } from '@/lib/db';
+import { employees as empApi, org, shifts as shiftApi } from '@/lib/db';
 
 const AVA = ['bg-orange-500', 'bg-sky-500', 'bg-violet-500', 'bg-emerald-500', 'bg-rose-500', 'bg-amber-500'];
 const col = (s = '') => AVA[(s.charCodeAt(0) || 0) % AVA.length];
@@ -202,9 +202,13 @@ function AddEmployee({ open, onClose, user, onDone }) {
     firstName: '', middleName: '', lastName: '', nickName: '', email: '', password: '',
     phone: '', gender: '', dob: '', bloodGroup: '', maritalStatus: '', smoker: 'No', address: '',
     employmentType: 'FULL_TIME', status: 'ACTIVE', dateOfJoining: '',
+    role: 'EMPLOYEE', shiftId: '', weeklyOff: '', accessUntil: '', band: '', division: '',
+    pan: '', uan: '', pfNumber: '', esiNumber: '',
+    bankAccountName: '', bankAccountNumber: '', bankIfsc: '', bankName: '',
   };
   const [form, setForm] = useState(empty);
   const [depts, setDepts] = useState([]); const [desigs, setDesigs] = useState([]); const [mgrs, setMgrs] = useState([]);
+  const [shifts, setShifts] = useState([]);
   const [deptId, setDeptId] = useState(''); const [desigId, setDesigId] = useState(''); const [managerId, setManagerId] = useState('');
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState(null);
@@ -212,21 +216,35 @@ function AddEmployee({ open, onClose, user, onDone }) {
   useEffect(() => {
     if (open) {
       org.departments().then(setDepts); org.designations().then(setDesigs); empApi.all().then(setMgrs).catch(() => {});
+      shiftApi.list().then(setShifts).catch(() => {});
       setCreated(null); setErr('');
     }
   }, [open]);
 
   const submit = async () => {
-    setErr(''); setBusy(true);
+    setErr('');
+    // --- validation: fail fast with a friendly message instead of a raw DB error ---
+    if (!form.firstName.trim()) { setErr('First name is required.'); return; }
+    if (form.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) { setErr('Enter a valid email address.'); return; }
+    if (form.password && form.password.length < 8) { setErr('Password must be at least 8 characters.'); return; }
+    if (form.role !== 'EMPLOYEE' && !form.email.trim()) { setErr('An email is required to give someone a Manager or HR role (they need a login).'); return; }
+    if (form.dob && form.dateOfJoining && form.dob >= form.dateOfJoining) { setErr('Date of birth must be before the date of joining.'); return; }
+    setBusy(true);
     try {
       const res = await empApi.create({
-        first_name: form.firstName, middle_name: form.middleName || null, last_name: form.lastName, nick_name: form.nickName || null,
-        email: form.email, password: form.password || undefined,
+        first_name: form.firstName.trim(), middle_name: form.middleName || null, last_name: form.lastName, nick_name: form.nickName || null,
+        email: form.email.trim() || undefined, password: form.password || undefined,
+        role: form.role,
         phone: form.phone || null, gender: form.gender || null, dob: form.dob || null,
         blood_group: form.bloodGroup || null, marital_status: form.maritalStatus || null, smoker: form.smoker === 'Yes',
         address: form.address || null, date_of_joining: form.dateOfJoining || null,
         department_id: deptId || null, designation_id: desigId || null, manager_id: managerId || null,
         employment_type: form.employmentType, status: form.status,
+        shift_id: form.shiftId || null, weekly_off: form.weeklyOff === '' ? null : Number(form.weeklyOff),
+        access_until: form.accessUntil || null, band: form.band || null, division: form.division || null,
+        pan: form.pan || null, uan: form.uan || null, pf_number: form.pfNumber || null, esi_number: form.esiNumber || null,
+        bank_account_name: form.bankAccountName || null, bank_account_number: form.bankAccountNumber || null,
+        bank_ifsc: form.bankIfsc || null, bank_name: form.bankName || null,
       });
       setCreated({ code: res.employee?.employee_code, login: res.login, warning: res.warning });
       setForm(empty); setDeptId(''); setDesigId(''); setManagerId('');
@@ -282,6 +300,20 @@ function AddEmployee({ open, onClose, user, onDone }) {
             <Fld label="Department"><select className="input" value={deptId} onChange={(e) => setDeptId(e.target.value)}><option value="">—</option>{depts.map((d) => <option key={d._id} value={d._id}>{d.name}</option>)}</select></Fld>
             <Fld label="Designation"><select className="input" value={desigId} onChange={(e) => setDesigId(e.target.value)}><option value="">—</option>{desigs.map((d) => <option key={d._id} value={d._id}>{d.title}</option>)}</select></Fld>
             <Fld label="Reporting manager"><select className="input" value={managerId} onChange={(e) => setManagerId(e.target.value)}><option value="">—</option>{mgrs.map((m) => <option key={m._id} value={m._id}>{m.firstName} {m.lastName} ({m.employeeId})</option>)}</select></Fld>
+            <Fld label="Role (access level)"><select className="input" value={form.role} onChange={set('role')}><option value="EMPLOYEE">Employee</option><option value="MANAGER">Manager (can approve their team)</option><option value="HR">HR</option></select></Fld>
+            <Fld label="Shift"><select className="input" value={form.shiftId} onChange={set('shiftId')}><option value="">—</option>{shifts.map((s) => <option key={s._id} value={s._id}>{s.name}</option>)}</select></Fld>
+            <Fld label="Weekly off"><select className="input" value={form.weeklyOff} onChange={set('weeklyOff')}><option value="">—</option><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></Fld>
+            <Fld label="Portal access until"><input type="date" className="input" value={form.accessUntil} onChange={set('accessUntil')} /></Fld>
+            <Fld label="Band / grade"><input className="input" value={form.band} onChange={set('band')} placeholder="e.g. B2" /></Fld>
+            <Fld label="Division"><input className="input" value={form.division} onChange={set('division')} /></Fld>
+            <Fld label="PAN"><input className="input" value={form.pan} onChange={set('pan')} /></Fld>
+            <Fld label="UAN"><input className="input" value={form.uan} onChange={set('uan')} /></Fld>
+            <Fld label="PF number"><input className="input" value={form.pfNumber} onChange={set('pfNumber')} /></Fld>
+            <Fld label="ESI number"><input className="input" value={form.esiNumber} onChange={set('esiNumber')} /></Fld>
+            <Fld label="Bank account holder"><input className="input" value={form.bankAccountName} onChange={set('bankAccountName')} /></Fld>
+            <Fld label="Bank account number"><input className="input" value={form.bankAccountNumber} onChange={set('bankAccountNumber')} /></Fld>
+            <Fld label="IFSC"><input className="input" value={form.bankIfsc} onChange={set('bankIfsc')} /></Fld>
+            <Fld label="Bank name"><input className="input" value={form.bankName} onChange={set('bankName')} /></Fld>
             <Fld label="Date of joining"><input className="input" type="date" value={form.dateOfJoining} onChange={set('dateOfJoining')} /></Fld>
             <Fld label="Employment type"><select className="input" value={form.employmentType} onChange={set('employmentType')}>{EMP_TYPES.map((t) => <option key={t} value={t}>{t.replace('_', ' ')}</option>)}</select></Fld>
             <Fld label="Employee status"><select className="input" value={form.status} onChange={set('status')}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></Fld>

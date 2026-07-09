@@ -78,7 +78,12 @@ function TimeModal({ companyId, employeeId, onClose, onDone }) {
   const [form, setForm] = useState({ date: new Date().toISOString().slice(0, 10), project: '', task: '', hours: '' });
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const save = async () => {
-    setErr(''); setBusy(true);
+    setErr('');
+    if (!form.date) { setErr('Pick a work date.'); return; }
+    const h = Number(form.hours || 0);
+    if (!(h > 0)) { setErr('Enter hours greater than 0.'); return; }
+    if (h > 24) { setErr('Hours cannot exceed 24 in a day.'); return; }
+    setBusy(true);
     try {
       await api.create({ company_id: companyId, employee_id: employeeId, work_date: form.date, project: form.project || null, task: form.task || null, hours: Number(form.hours || 0), status: 'SUBMITTED' });
       onClose(); onDone();

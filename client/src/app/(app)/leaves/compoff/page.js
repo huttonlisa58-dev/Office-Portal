@@ -78,7 +78,12 @@ function CompOffModal({ companyId, employeeId, onClose, onDone }) {
   const [form, setForm] = useState({ workedDate: new Date().toISOString().slice(0, 10), days: 1, reason: '' });
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const save = async () => {
-    setErr(''); setBusy(true);
+    setErr('');
+    if (!form.workedDate) { setErr('Pick the date you worked.'); return; }
+    if (form.workedDate > new Date().toISOString().slice(0, 10)) { setErr('Worked date cannot be in the future.'); return; }
+    const d = Number(form.days || 0);
+    if (!(d > 0)) { setErr('Days must be greater than 0.'); return; }
+    setBusy(true);
     try {
       await api.create({ company_id: companyId, employee_id: employeeId, worked_date: form.workedDate, days: Number(form.days || 1), reason: form.reason || null, status: 'PENDING' });
       onClose(); onDone();
