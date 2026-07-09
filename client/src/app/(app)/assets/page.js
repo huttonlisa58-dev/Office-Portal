@@ -68,14 +68,14 @@ export default function AssetsPage() {
 
 function AssetModal({ asset, emps, companyId, onClose, onDone }) {
   const isNew = !asset._id;
-  const [form, setForm] = useState({ name: asset.name || '', tag: asset.tag || '', category: asset.category || '', status: asset.status || 'AVAILABLE', assignedTo: asset.assignedTo || '' });
+  const [form, setForm] = useState({ name: asset.name || '', tag: asset.tag || '', category: asset.category || '', status: asset.status || 'AVAILABLE', assignedTo: asset.assignedTo || '', notes: asset.notes || '' });
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const save = async () => {
     setErr('');
     if (!form.name.trim()) { setErr('Asset name is required.'); return; }
     setBusy(true);
     try {
-      const payload = { name: form.name, tag: form.tag || null, category: form.category || null, status: form.status, assigned_to: form.assignedTo || null };
+      const payload = { name: form.name.trim(), tag: form.tag || null, category: form.category || null, status: form.status, assigned_to: form.assignedTo || null, notes: form.notes || null };
       if (isNew) await api.create({ ...payload, company_id: companyId });
       else await api.update(asset._id, payload);
       onClose(); onDone();
@@ -92,6 +92,7 @@ function AssetModal({ asset, emps, companyId, onClose, onDone }) {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div><label className="label">Status</label><select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}</select></div>
+          <div><label className="label">Notes</label><textarea className="input" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Serial number, condition, warranty…" /></div>
           <div><label className="label">Assigned to</label><select className="input" value={form.assignedTo} onChange={(e) => setForm({ ...form, assignedTo: e.target.value })}><option value="">— none —</option>{emps.map((e) => <option key={e._id} value={e._id}>{e.firstName} {e.lastName}</option>)}</select></div>
         </div>
         <div className="flex justify-end gap-2 pt-1"><button className="btn-outline" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={busy || !form.name} onClick={save}>{isNew ? 'Add' : 'Save'}</button></div>

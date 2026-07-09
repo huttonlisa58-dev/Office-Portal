@@ -97,7 +97,11 @@ function ExpenseModal({ companyId, employeeId, onClose, onDone }) {
   const [file, setFile] = useState(null);
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
   const save = async () => {
-    setErr(''); setBusy(true);
+    setErr('');
+    if (!form.date) { setErr('Pick the expense date.'); return; }
+    if (form.date > new Date().toISOString().slice(0, 10)) { setErr('Expense date cannot be in the future.'); return; }
+    if (!(Number(form.amount) > 0)) { setErr('Amount must be greater than 0.'); return; }
+    setBusy(true);
     try {
       let receipt_path = null;
       if (file) {

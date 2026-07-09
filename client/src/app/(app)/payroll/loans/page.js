@@ -75,7 +75,15 @@ function LoanModal({ onClose, onDone, companyId }) {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   useEffect(() => { empApi.list({ limit: 200 }).then((r) => setEmployees(r.items)).catch(() => {}); }, []);
   const save = async () => {
-    setErr(''); setBusy(true);
+    setErr('');
+    if (!form.employeeId) { setErr('Pick an employee.'); return; }
+    const principal = Number(form.principal || 0);
+    const emi = Number(form.emi || 0);
+    if (!(principal > 0)) { setErr('Principal must be greater than 0.'); return; }
+    if (!(emi > 0)) { setErr('EMI must be greater than 0.'); return; }
+    if (emi > principal) { setErr('EMI cannot be larger than the principal.'); return; }
+    if (!form.startDate) { setErr('Pick a start date.'); return; }
+    setBusy(true);
     try { await api.create({ companyId, ...form }); onDone(); }
     catch (e) { setErr(e.message || 'Could not save'); } finally { setBusy(false); }
   };
