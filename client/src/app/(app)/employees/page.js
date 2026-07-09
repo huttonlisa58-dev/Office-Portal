@@ -205,6 +205,9 @@ function AddEmployee({ open, onClose, user, onDone }) {
     role: 'EMPLOYEE', shiftId: '', weeklyOff: '', accessUntil: '', band: '', division: '',
     workLocationId: '', personalEmail: '', homePhone: '', communicationAddress: '',
     city: '', state: '', country: '', postalCode: '',
+    fatherName: '', motherName: '', nationality: '', religion: '', aadhaar: '', physicallyChallenged: 'No',
+    probationEndDate: '', confirmationDate: '', noticePeriodDays: '', exitDate: '',
+    emergencyName: '', emergencyRelationship: '', emergencyPhone: '', emergencyAltPhone: '',
     pan: '', uan: '', pfNumber: '', esiNumber: '',
     bankAccountName: '', bankAccountNumber: '', bankIfsc: '', bankName: '',
   };
@@ -243,6 +246,9 @@ function AddEmployee({ open, onClose, user, onDone }) {
     if (form.role !== 'EMPLOYEE' && !form.email.trim()) { setErr('An email is required to give someone a Manager or HR role (they need a login).'); return; }
     if (form.dob && form.dateOfJoining && form.dob >= form.dateOfJoining) { setErr('Date of birth must be before the date of joining.'); return; }
     if (form.pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(form.pan)) { setErr('PAN should look like ABCDE1234F.'); return; }
+    if (form.aadhaar && !/^\d{12}$/.test(form.aadhaar.replace(/\s/g, ''))) { setErr('Aadhaar must be 12 digits.'); return; }
+    if (form.noticePeriodDays !== '' && (Number(form.noticePeriodDays) < 0 || Number(form.noticePeriodDays) > 365)) { setErr('Notice period must be between 0 and 365 days.'); return; }
+    if (form.emergencyName && !form.emergencyPhone) { setErr('Add a phone number for the emergency contact.'); return; }
     if (form.bankIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(form.bankIfsc)) { setErr('IFSC should look like HDFC0001234.'); return; }
     if (form.bankAccountNumber && !/^\d{6,20}$/.test(form.bankAccountNumber)) { setErr('Bank account number should be 6–20 digits.'); return; }
     setBusy(true);
@@ -262,6 +268,15 @@ function AddEmployee({ open, onClose, user, onDone }) {
         personal_email: form.personalEmail || null, home_phone: form.homePhone || null,
         communication_address: form.communicationAddress || null,
         city: form.city || null, state: form.state || null, country: form.country || null, postal_code: form.postalCode || null,
+        father_name: form.fatherName || null, mother_name: form.motherName || null,
+        nationality: form.nationality || null, religion: form.religion || null,
+        aadhaar: form.aadhaar ? form.aadhaar.replace(/\s/g, '') : null,
+        physically_challenged: form.physicallyChallenged === 'Yes',
+        probation_end_date: form.probationEndDate || null, confirmation_date: form.confirmationDate || null,
+        notice_period_days: form.noticePeriodDays === '' ? null : Number(form.noticePeriodDays),
+        exit_date: form.exitDate || null,
+        emergency_name: form.emergencyName || null, emergency_relationship: form.emergencyRelationship || null,
+        emergency_phone: form.emergencyPhone || null, emergency_alt_phone: form.emergencyAltPhone || null,
         pan: form.pan || null, uan: form.uan || null, pf_number: form.pfNumber || null, esi_number: form.esiNumber || null,
         bank_account_name: form.bankAccountName || null, bank_account_number: form.bankAccountNumber || null,
         bank_ifsc: form.bankIfsc || null, bank_name: form.bankName || null,
@@ -311,6 +326,12 @@ function AddEmployee({ open, onClose, user, onDone }) {
             <Fld label="Blood group"><select className="input" value={form.bloodGroup} onChange={set('bloodGroup')}><option value="">—</option>{BLOODS.map((b) => <option key={b} value={b}>{b}</option>)}</select></Fld>
             <Fld label="Marital status"><select className="input" value={form.maritalStatus} onChange={set('maritalStatus')}><option value="">—</option>{MARITALS.map((m) => <option key={m} value={m}>{m}</option>)}</select></Fld>
             <Fld label="Smoker"><select className="input" value={form.smoker} onChange={set('smoker')}><option>No</option><option>Yes</option></select></Fld>
+            <Fld label="Father&apos;s name"><input className="input" value={form.fatherName} onChange={set('fatherName')} /></Fld>
+            <Fld label="Mother&apos;s name"><input className="input" value={form.motherName} onChange={set('motherName')} /></Fld>
+            <Fld label="Nationality"><input className="input" value={form.nationality} onChange={set('nationality')} placeholder="Indian" /></Fld>
+            <Fld label="Religion"><input className="input" value={form.religion} onChange={set('religion')} /></Fld>
+            <Fld label="Aadhaar"><input className="input" value={form.aadhaar} onChange={set('aadhaar')} placeholder="12 digits" inputMode="numeric" maxLength={12} /></Fld>
+            <Fld label="Physically challenged"><select className="input" value={form.physicallyChallenged} onChange={set('physicallyChallenged')}><option>No</option><option>Yes</option></select></Fld>
             <Fld label="Phone"><input className="input" value={form.phone} onChange={set('phone')} placeholder="+91 98765 43210" /></Fld>
             <Fld label="Personal email"><input className="input" type="email" value={form.personalEmail} onChange={set('personalEmail')} placeholder="Used after they leave" /></Fld>
             <Fld label="Home phone"><input className="input" value={form.homePhone} onChange={set('homePhone')} /></Fld>
@@ -337,6 +358,9 @@ function AddEmployee({ open, onClose, user, onDone }) {
             <Fld label="Band / grade"><input className="input" value={form.band} onChange={set('band')} placeholder="e.g. B2" /></Fld>
             <Fld label="Division"><input className="input" value={form.division} onChange={set('division')} placeholder="e.g. Operations" /></Fld>
             <Fld label="Work location"><select className="input" value={form.workLocationId} onChange={set('workLocationId')}><option value="">—</option>{locs.map((l) => <option key={l._id} value={l._id}>{l.name}</option>)}</select></Fld>
+            <Fld label="Probation ends"><input type="date" className="input" value={form.probationEndDate} onChange={set('probationEndDate')} /></Fld>
+            <Fld label="Confirmation date"><input type="date" className="input" value={form.confirmationDate} onChange={set('confirmationDate')} /></Fld>
+            <Fld label="Notice period (days)"><input className="input" value={form.noticePeriodDays} onChange={set('noticePeriodDays')} inputMode="numeric" placeholder="e.g. 30" /></Fld>
           </div>
           <div>
             <Fld label="Role (access level)"><select className="input" value={form.role} onChange={set('role')}><option value="EMPLOYEE">Employee</option><option value="MANAGER">Manager</option><option value="HR">HR</option></select></Fld>
@@ -347,6 +371,15 @@ function AddEmployee({ open, onClose, user, onDone }) {
             </p>
           </div>
           <Fld label="Portal access until"><input type="date" className="input" value={form.accessUntil} onChange={set('accessUntil')} /><p className="mt-1 text-xs text-slate-400">Leave blank for permanent access. After this date the employee can&apos;t sign in.</p></Fld>
+
+          <SectionLabel>Emergency contact</SectionLabel>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Fld label="Name"><input className="input" value={form.emergencyName} onChange={set('emergencyName')} /></Fld>
+            <Fld label="Relationship"><input className="input" value={form.emergencyRelationship} onChange={set('emergencyRelationship')} placeholder="e.g. Spouse, Father" /></Fld>
+            <Fld label="Phone"><input className="input" value={form.emergencyPhone} onChange={set('emergencyPhone')} /></Fld>
+            <Fld label="Alternate phone"><input className="input" value={form.emergencyAltPhone} onChange={set('emergencyAltPhone')} /></Fld>
+          </div>
+          <p className="-mt-1 text-xs text-slate-400">More contacts can be added later from the employee&apos;s profile.</p>
 
           <SectionLabel>Statutory</SectionLabel>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
