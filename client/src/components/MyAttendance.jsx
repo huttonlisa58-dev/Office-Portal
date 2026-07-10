@@ -225,9 +225,20 @@ export default function MyAttendance({ employeeId }) {
     for (const [date, sessions] of Object.entries(punchMap)) {
       if (!sessions.length) continue;
       const day = computeDay(sessions, Date.now());
-      const ins = sessions.filter((s) => s.type === 'IN').map((s) => s.at);
-      const outs = sessions.filter((s) => s.type === 'OUT').map((s) => s.at);
-      out[date] = { workMin: Math.floor(day.workMs / 60000), first: ins[0] || null, last: outs[outs.length - 1] || null, manual: sessions.some((s) => s.method === 'MANUAL') };
+      // First check-in and last check-out come from the PAIRED sessions, not from two
+      // independent IN/OUT lists — otherwise an overnight OUT (e.g. 05:00 next day) renders
+      // as "Last out" earlier than "First in", making check-out look before check-in.
+      const firstIn = day.sessions.find((s) => s.in)?.in || null;
+      const lastSession = [...day.sessions].reverse().find((s) => s.out) || null;
+      const lastOut = lastSession?.out || null;
+      // flag when the last check-out falls on a later calendar day than the row's date
+      const outDate = lastOut ? (() => { const d = new Date(lastOut); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })() : null;
+      const spansMidnight = outDate ? outDate > date : false;
+      out[date] = {
+        workMin: Math.floor(day.workMs / 60000),
+        first: firstIn, last: lastOut, spansMidnight,
+        manual: sessions.some((s) => s.method === 'MANUAL'),
+      };
     }
     return out;
   }, [punchMap]);
@@ -255,7 +266,7 @@ export default function MyAttendance({ employeeId }) {
   }, [data, days, year, month, todayStr, punchStats, pendingDates]);
 
   const firstLast = useMemo(() => Object.entries(punchStats)
-    .map(([date, st]) => ({ date, first: st.first, last: st.last, total: st.workMin }))
+    .map(([date, st]) => ({ date, first: st.first, last: st.last, total: st.workMin, spansMidnight: st.spansMidnight }))
     .sort((a, b) => b.date.localeCompare(a.date)), [punchStats]);
 
   const go = (delta) => { let m = month + delta, y = year; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } setMonth(m); setYear(y); };
@@ -318,7 +329,7 @@ export default function MyAttendance({ employeeId }) {
                 <tr key={r.date} className="border-b last:border-0">
                   <td className="px-5 py-3 font-medium">{new Date(r.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}</td>
                   <td className="px-5 py-3 text-slate-500">{fmtTime(r.first)}</td>
-                  <td className="px-5 py-3 text-slate-500">{fmtTime(r.last)}</td>
+                  <td className="px-5 py-3 text-slate-500">{fmtTime(r.last)}{r.spansMidnight && <span className="ml-1 rounded bg-slate-100 px-1 text-[10px] font-medium text-slate-500 dark:bg-slate-700" title="Checked out after midnight (next day)">+1d</span>}</td>
                   <td className="px-5 py-3 text-slate-500">{fmtDur(r.total)}</td>
                 </tr>
               ))}
