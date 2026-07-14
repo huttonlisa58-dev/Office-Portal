@@ -196,6 +196,16 @@ export const employees = {
     if (error) throw new Error(error.message);
     return data;
   },
+  // Quick actions from the employee list.
+  async setStatus(id, status) {
+    const { error } = await supabase.from('employees').update({ status }).eq('id', id);
+    if (error) throw new Error(error.message);
+  },
+  async setAccess(id, accessUntil) {
+    // accessUntil = null -> permanent; a past date -> portal access blocked by guard_access_until
+    const { error } = await supabase.from('employees').update({ access_until: accessUntil }).eq('id', id);
+    if (error) throw new Error(error.message);
+  },
   async orgData() {
     const { data } = await supabase.from('employees')
       .select('*, department:departments(name), designation:designations(title)')

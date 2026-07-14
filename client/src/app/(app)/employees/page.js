@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Users, Plus, Search, List, Network, ChevronLeft, ChevronRight, Pencil } from 'lucide-react';
+import { Users, Plus, Search, List, Network, ChevronLeft, ChevronRight, Pencil, UserX, UserCheck, Lock, Unlock } from 'lucide-react';
 import PageBanner from '@/components/PageBanner';
 import Loader from '@/components/Loader';
 import Modal from '@/components/Modal';
@@ -48,6 +48,22 @@ function EmployeeList({ canManage, user }) {
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  const isAccessDisabled = (e) => !!(e.accessUntil && e.accessUntil < new Date().toISOString().slice(0, 10));
+  const toggleStatus = async (e) => {
+    const next = e.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    if (!window.confirm(`${next === 'INACTIVE' ? 'Deactivate' : 'Reactivate'} ${e.firstName} ${e.lastName || ''}?`)) return;
+    setBusyId(e._id);
+    try { await empApi.setStatus(e._id, next); await load(); } catch (err) { alert(err.message || 'Could not update'); } finally { setBusyId(null); }
+  };
+  const toggleAccess = async (e) => {
+    const disabled = isAccessDisabled(e);
+    const next = disabled ? null : new Date().toISOString().slice(0, 10);
+    if (!window.confirm(`${disabled ? 'Restore portal access for' : 'Disable portal access for'} ${e.firstName}?`)) return;
+    setBusyId(e._id);
+    try { await empApi.setAccess(e._id, next); await load(); } catch (err) { alert(err.message || 'Could not update'); } finally { setBusyId(null); }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -89,8 +105,16 @@ function EmployeeList({ canManage, user }) {
                     <td className="px-5 py-3 text-slate-500">{e.department?.name || '—'}</td>
                     <td className="px-5 py-3 text-slate-500">{ROLE_LABEL[e.role] || 'Employee'}</td>
                     <td className="px-5 py-3 text-slate-500">{e.employmentType || 'Permanent'}</td>
-                    <td className="px-5 py-3"><span className="badge bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300">{e.status === 'ACTIVE' ? 'Active' : e.status}</span></td>
-                    {canManage && <td className="px-5 py-3"><button className="btn-ghost p-1.5" onClick={(ev) => { ev.stopPropagation(); setEditing(e); }} title="Edit employee"><Pencil size={15} /></button></td>}
+                    <td className="px-5 py-3"><span className={cls('badge', e.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400')}>{e.status === 'ACTIVE' ? 'Active' : (e.status?.[0] + e.status?.slice(1).toLowerCase())}</span>{isAccessDisabled(e) && <span className="badge ml-1 bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" title={`Portal access disabled on ${e.accessUntil}`}>No access</span>}</td>
+                    {canManage && (
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-0.5" onClick={(ev) => ev.stopPropagation()}>
+                          <button className="btn-ghost p-1.5" onClick={() => setEditing(e)} title="Edit employee"><Pencil size={15} /></button>
+                          <button className="btn-ghost p-1.5" disabled={busyId === e._id} onClick={() => toggleAccess(e)} title={isAccessDisabled(e) ? 'Restore portal access' : 'Disable portal access'}>{isAccessDisabled(e) ? <Unlock size={15} /> : <Lock size={15} />}</button>
+                          <button className="btn-ghost p-1.5" disabled={busyId === e._id} onClick={() => toggleStatus(e)} title={e.status === 'ACTIVE' ? 'Deactivate employee' : 'Reactivate employee'}>{e.status === 'ACTIVE' ? <UserX size={15} className="text-rose-500" /> : <UserCheck size={15} className="text-emerald-600" />}</button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
