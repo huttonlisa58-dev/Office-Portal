@@ -19,7 +19,7 @@ function haversineM(lat1, lon1, lat2, lon2) {
 }
 const mLeave = (r) => ({ _id: r.id, type: r.leave_type, from: r.from_date, to: r.to_date, days: r.days, reason: r.reason, status: r.status, appliedOn: r.created_at, decisionNote: r.decision_note, decidedAt: r.decided_at || null, decidedBy: r.decider ? `${r.decider.first_name} ${r.decider.last_name}`.trim() : null, employee: r.employee ? { ...mEmpRef(r.employee), location: r.employee.location || null, designation: r.employee.designation?.title || null } : null });
 const mAtt = (r) => ({ _id: r.id, date: r.work_date, status: r.status, isLate: r.is_late, workedMinutes: r.worked_minutes, overtimeMinutes: r.overtime_minutes, checkIn: r.check_in_at ? { time: r.check_in_at, method: r.check_in_method } : null, checkOut: r.check_out_at ? { time: r.check_out_at } : null, employee: mEmpRef(r.employee) });
-const mPay = (r) => ({ _id: r.id, month: r.month, year: r.year, currency: r.currency, basic: r.basic, gross: r.gross, tax: r.tax, tds: r.tds, bonus: r.bonus, lopDays: r.lop_days, allowances: r.allowances || [], deductions: r.deductions || [], employerContrib: r.employer_contrib || [], netPay: r.net_pay, status: r.status, isWithheld: r.is_withheld || false, employee: r.employee ? { ...mEmpRef(r.employee), pan: r.employee.pan || null, uan: r.employee.uan || null, bankAccountNumber: r.employee.bank_account_number || null, bankName: r.employee.bank_name || null } : null });
+const mPay = (r) => ({ _id: r.id, month: r.month, year: r.year, currency: r.currency, basic: r.basic, gross: r.gross, tax: r.tax, tds: r.tds, bonus: r.bonus, lopDays: r.lop_days, allowances: r.allowances || [], deductions: r.deductions || [], employerContrib: r.employer_contrib || [], netPay: r.net_pay, status: r.status, isWithheld: r.is_withheld || false, employee: r.employee ? { ...mEmpRef(r.employee), pan: r.employee.pan || null, uan: r.employee.uan || null, bankAccountNumber: r.employee.bank_account_number || null, bankName: r.employee.bank_name || null, bankIfsc: r.employee.bank_ifsc || null, bankAccountName: r.employee.bank_account_name || null } : null });
 const mCompany = (r) => ({ _id: r.id, name: r.name, slug: r.slug, isActive: r.is_active, createdAt: r.created_at, subscription: { plan: r.plan } });
 
 async function invoke(name, body) {
@@ -496,7 +496,7 @@ export const leaveEncashment = {
 export const payroll = {
   async list(viewer = {}) {
     const seesAll = ['SUPER_ADMIN', 'COMPANY_ADMIN', 'HR'].includes(viewer.role);
-    let q = supabase.from('payrolls').select('*, employee:employees(first_name,last_name,employee_code,pan,uan,bank_account_number,bank_name)').order('year', { ascending: false }).order('month', { ascending: false });
+    let q = supabase.from('payrolls').select('*, employee:employees(first_name,last_name,employee_code,pan,uan,bank_account_number,bank_name,bank_ifsc,bank_account_name)').order('year', { ascending: false }).order('month', { ascending: false });
     if (!seesAll) {
       if (!viewer.employeeId) return [];
       q = q.eq('employee_id', viewer.employeeId);

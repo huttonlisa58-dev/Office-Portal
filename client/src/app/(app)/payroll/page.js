@@ -95,12 +95,44 @@ export default function PayrollPage() {
     return name.includes(needle) || code.includes(needle);
   });
 
+  // Bank statement export: a salary-upload CSV for net-pay transfers.
+  // Skips anyone without an account number + IFSC and tells you who was skipped,
+  // so you never silently under-pay someone.
+  const exportBank = () => {
+    const payable = shown.filter((p) => p.employee?.bankAccountNumber && p.employee?.bankIfsc);
+    const skipped = shown.filter((p) => !(p.employee?.bankAccountNumber && p.employee?.bankIfsc));
+    if (!payable.length) {
+      alert(`No payslips have bank details.\n\nAdd account number + IFSC on the employee (Edit employee → Bank details) before exporting.${skipped.length ? `\n\nMissing for: ${skipped.map((p) => p.employee?.employeeId || '?').join(', ')}` : ''}`);
+      return;
+    }
+    const esc = (v) => { const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+    const rows = [
+      ['Beneficiary Name', 'Beneficiary Account Number', 'IFSC', 'Bank Name', 'Amount', 'Payment Ref', 'Remarks'],
+      ...payable.map((p) => [
+        p.employee?.bankAccountName || `${p.employee?.firstName || ''} ${p.employee?.lastName || ''}`.trim(),
+        p.employee?.bankAccountNumber, p.employee?.bankIfsc, p.employee?.bankName || '',
+        Number(p.netPay || 0).toFixed(2),
+        `SAL-${p.employee?.employeeId || ''}-${String(p.month).padStart(2, '0')}${p.year}`,
+        `Salary ${MONTHS[p.month - 1]} ${p.year}`,
+      ]),
+    ];
+    const csv = rows.map((r) => r.map(esc).join(',')).join('\r\n');
+    const total = payable.reduce((s, p) => s + Number(p.netPay || 0), 0);
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `salary-bank-transfer-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click(); URL.revokeObjectURL(url);
+    if (skipped.length) alert(`Exported ${payable.length} transfer(s) totalling ${total.toFixed(2)}.\n\nSkipped ${skipped.length} (no bank details): ${skipped.map((p) => p.employee?.employeeId || '?').join(', ')}`);
+  };
+
   return (
     <>
       <PageHeader title="Payroll" subtitle="Generate runs, manage salary structures, and issue payslips"
         actions={canManage && (
           <div className="flex gap-2">
             <button className="btn-outline" onClick={() => setStructOpen(true)}><Settings2 size={16} /> Salary structure</button>
+            <button className="btn-outline" onClick={exportBank} title="Download a bank salary-transfer file for the payslips shown"><Download size={16} /> Bank file</button>
             <button className="btn-outline" onClick={() => setRunAllOpen(true)}><Play size={16} /> Run for all</button>
             <button className="btn-outline" onClick={() => setPayRunsOpen(true)}><Layers size={16} /> Pay runs</button>
             <button className="btn-primary" onClick={() => setGenOpen(true)}><Plus size={16} /> Generate payroll</button>
