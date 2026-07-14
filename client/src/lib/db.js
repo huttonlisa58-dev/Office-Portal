@@ -458,12 +458,17 @@ export const leaves = {
 export const leavePolicies = {
   async list() {
     const { data } = await supabase.from('leave_policies').select('*').order('leave_type');
-    return (data || []).map((p) => ({ _id: p.id, leaveType: p.leave_type, annualQuota: Number(p.annual_quota), accrualPerMonth: Number(p.accrual_per_month), eligibilityMonths: p.eligibility_months, carryForwardCap: p.carry_forward_cap == null ? null : Number(p.carry_forward_cap), reasonRequiredDays: p.reason_required_days == null ? null : Number(p.reason_required_days), isActive: p.is_active }));
+    return (data || []).map((p) => ({ _id: p.id, leaveType: p.leave_type, annualQuota: Number(p.annual_quota), accrualPerMonth: Number(p.accrual_per_month), eligibilityMonths: p.eligibility_months, carryForwardCap: p.carry_forward_cap == null ? null : Number(p.carry_forward_cap), reasonRequiredDays: p.reason_required_days == null ? null : Number(p.reason_required_days), expiryMode: p.expiry_mode || 'NONE', expiryDay: p.expiry_day || '', isActive: p.is_active }));
   },
-  async upsert(companyId, leaveType, { annualQuota, accrualPerMonth, eligibilityMonths, carryForwardCap, reasonRequiredDays }) {
+  async upsert(companyId, leaveType, { annualQuota, accrualPerMonth, eligibilityMonths, carryForwardCap, reasonRequiredDays, expiryMode, expiryDay }) {
     const row = { company_id: companyId, leave_type: leaveType, annual_quota: annualQuota, accrual_per_month: accrualPerMonth, eligibility_months: eligibilityMonths, is_active: true };
     if (carryForwardCap !== undefined) row.carry_forward_cap = carryForwardCap === '' || carryForwardCap == null ? null : carryForwardCap;
     if (reasonRequiredDays !== undefined) row.reason_required_days = reasonRequiredDays === '' || reasonRequiredDays == null ? null : reasonRequiredDays;
+    if (expiryMode !== undefined) {
+      row.expiry_mode = expiryMode || 'NONE';
+      // the DB enforces: FIXED_DATE needs a day, other modes must not carry one
+      row.expiry_day = row.expiry_mode === 'FIXED_DATE' ? (expiryDay || null) : null;
+    }
     const { error } = await supabase.from('leave_policies').upsert(row, { onConflict: 'company_id,leave_type' });
     if (error) throw new Error(error.message);
   },

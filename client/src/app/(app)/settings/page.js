@@ -35,8 +35,8 @@ export default function SettingsPage() {
       const [d, g, sh, em, lps] = await Promise.all([org.departments(), org.designations(), shiftApi.listAll(), empApi.all().catch(() => []), lpApi.list().catch(() => [])]);
       setDepts(d); setDesigs(g); setShiftList(sh); setEmpList(em || []);
       const pm = {};
-      (lps || []).forEach((p) => { pm[p.leaveType] = { annualQuota: p.annualQuota, accrualPerMonth: p.accrualPerMonth, eligibilityMonths: p.eligibilityMonths, carryForwardCap: p.carryForwardCap ?? '', reasonRequiredDays: p.reasonRequiredDays ?? '' }; });
-      ['EARNED', 'SICK', 'CASUAL'].forEach((t) => { if (!pm[t]) pm[t] = { annualQuota: 0, accrualPerMonth: 0, eligibilityMonths: 0, carryForwardCap: '', reasonRequiredDays: '' }; });
+      (lps || []).forEach((p) => { pm[p.leaveType] = { annualQuota: p.annualQuota, accrualPerMonth: p.accrualPerMonth, eligibilityMonths: p.eligibilityMonths, carryForwardCap: p.carryForwardCap ?? '', reasonRequiredDays: p.reasonRequiredDays ?? '', expiryMode: p.expiryMode || 'NONE', expiryDay: p.expiryDay || '' }; });
+      ['EARNED', 'SICK', 'CASUAL'].forEach((t) => { if (!pm[t]) pm[t] = { annualQuota: 0, accrualPerMonth: 0, eligibilityMonths: 0, carryForwardCap: '', reasonRequiredDays: '', expiryMode: 'NONE', expiryDay: '' }; });
       setPol(pm);
     } catch { /* ignore */ } finally { setLoading(false); }
   }, []);
@@ -77,11 +77,19 @@ export default function SettingsPage() {
     try {
       for (const t of ['EARNED', 'SICK', 'CASUAL']) {
         const row = pol[t] || {};
+        if (row.expiryMode === 'FIXED_DATE' && !/^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(String(row.expiryDay || ''))) {
+          setPolMsg(`${t}: enter the expiry date as MM-DD (e.g. 12-31).`); setPolBusy(false); return;
+        }
+      }
+      for (const t of ['EARNED', 'SICK', 'CASUAL']) {
+        const row = pol[t] || {};
         await lpApi.upsert(company.id, t, {
           annualQuota: Number(row.annualQuota) || 0,
           accrualPerMonth: Number(row.accrualPerMonth) || 0,
           eligibilityMonths: Number(row.eligibilityMonths) || 0,
           carryForwardCap: row.carryForwardCap === '' || row.carryForwardCap == null ? null : Number(row.carryForwardCap),
+          expiryMode: row.expiryMode || 'NONE',
+          expiryDay: row.expiryDay || '',
           reasonRequiredDays: row.reasonRequiredDays === '' || row.reasonRequiredDays == null ? null : Number(row.reasonRequiredDays),
         });
       }
@@ -211,7 +219,7 @@ export default function SettingsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead><tr className="text-left text-slate-400">
-                <th className="py-2 pr-4 font-medium">Leave type</th><th className="py-2 pr-4 font-medium">Annual quota</th><th className="py-2 pr-4 font-medium">Accrual / month</th><th className="py-2 pr-4 font-medium">Eligibility (months)</th><th className="py-2 pr-4 font-medium">Carry-forward cap</th><th className="py-2 pr-4 font-medium">Reason required (≥ days)</th>
+                <th className="py-2 pr-4 font-medium">Leave type</th><th className="py-2 pr-4 font-medium">Annual quota</th><th className="py-2 pr-4 font-medium">Accrual / month</th><th className="py-2 pr-4 font-medium">Eligibility (months)</th><th className="py-2 pr-4 font-medium">Carry-forward cap</th><th className="py-2 pr-4 font-medium">Reason required (≥ days)</th><th className="py-2 pr-4 font-medium">Expiry</th>
               </tr></thead>
               <tbody>
                 {[['EARNED', 'Earned Leave'], ['SICK', 'Sick Leave'], ['CASUAL', 'Casual Leave']].map(([t, label]) => (
@@ -222,6 +230,18 @@ export default function SettingsPage() {
                     <td className="py-2 pr-4"><input type="number" step="1" min="0" className="input w-24" value={pol[t]?.eligibilityMonths ?? ''} onChange={setPolField(t, 'eligibilityMonths')} /></td>
                     <td className="py-2 pr-4"><input type="number" step="0.5" min="0" placeholder="none" className="input w-24" value={pol[t]?.carryForwardCap ?? ''} onChange={setPolField(t, 'carryForwardCap')} /></td>
                     <td className="py-2 pr-4"><input type="number" step="1" min="0" placeholder="off" className="input w-24" value={pol[t]?.reasonRequiredDays ?? ''} onChange={setPolField(t, 'reasonRequiredDays')} /></td>
+                    <td className="py-2 pr-4">
+                      <div className="flex items-center gap-2">
+                        <select className="input w-44" value={pol[t]?.expiryMode || 'NONE'} onChange={setPolField(t, 'expiryMode')}>
+                          <option value="NONE">Never expires</option>
+                          <option value="END_OF_ACCRUAL_MONTH">At end of each month</option>
+                          <option value="FIXED_DATE">On a date each year</option>
+                        </select>
+                        {pol[t]?.expiryMode === 'FIXED_DATE' && (
+                          <input className="input w-24" placeholder="MM-DD" maxLength={5} value={pol[t]?.expiryDay || ''} onChange={setPolField(t, 'expiryDay')} title="Day each year when the balance lapses to the carry-forward cap, e.g. 12-31" />
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
