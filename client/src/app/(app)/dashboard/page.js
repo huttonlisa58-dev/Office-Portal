@@ -121,17 +121,23 @@ function Company({ name, profile }) {
               </div>
             )}
             <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-            <Widget icon={Cake} title="Birthday">
-              {data.birthdays.length ? data.birthdays.map((p, i) => <Person key={p.id} i={i} id={p.id} name={p.name} sub={p.role} meta={fmtDate(p.date)} />) : <Empty text="No upcoming birthdays." />}
-            </Widget>
+            {data.showPeopleWidgets && (
+              <Widget icon={Cake} title="Birthday">
+                {data.birthdays.length ? data.birthdays.map((p, i) => <Person key={p.id} i={i} id={p.id} name={p.name} sub={p.role} meta={fmtDate(p.date)} />) : <Empty text="No upcoming birthdays." />}
+              </Widget>
+            )}
 
-            <Widget icon={UserPlus} title="New joiners">
-              {data.newJoiners.length ? data.newJoiners.map((p, i) => <Person key={p.id} i={i} id={p.id} name={p.name} sub={p.role} meta={fmtDate(p.date)} />) : <Empty text="No new joiners in the last 30 days." />}
-            </Widget>
+            {data.showPeopleWidgets && (
+              <Widget icon={UserPlus} title="New joiners">
+                {data.newJoiners.length ? data.newJoiners.map((p, i) => <Person key={p.id} i={i} id={p.id} name={p.name} sub={p.role} meta={fmtDate(p.date)} />) : <Empty text="No new joiners in the last 30 days." />}
+              </Widget>
+            )}
 
-            <Widget icon={Users} title="Department members">
-              {data.departmentMembers.length ? data.departmentMembers.map((p, i) => <Person key={p.id} i={i} id={p.id} name={p.name} sub={p.role} />) : <Empty text="No department members yet." />}
-            </Widget>
+            {data.showPeopleWidgets && (
+              <Widget icon={Users} title="Department members">
+                {data.departmentMembers.length ? data.departmentMembers.map((p, i) => <Person key={p.id} i={i} id={p.id} name={p.name} sub={p.role} />) : <Empty text="No department members yet." />}
+              </Widget>
+            )}
 
             <Widget icon={CalendarDays} title="Upcoming holidays">
               {data.holidays.length ? data.holidays.map((h, i) => (
@@ -159,9 +165,11 @@ function Company({ name, profile }) {
               ) : <Empty text="No leave balance linked to your account." />}
             </Widget>
 
-            <Widget icon={UserMinus} title="People on leave">
-              {data.peopleOnLeave.length ? data.peopleOnLeave.map((p, i) => <Person key={i} i={i} name={p.name} sub={p.role} meta={`till ${fmtDate(p.until)}`} />) : <Empty text="Everyone&apos;s in today." />}
-            </Widget>
+            {data.showPeopleWidgets && (
+              <Widget icon={UserMinus} title="People on leave">
+                {data.peopleOnLeave.length ? data.peopleOnLeave.map((p, i) => <Person key={i} i={i} name={p.name} sub={p.role} meta={`till ${fmtDate(p.until)}`} />) : <Empty text="Everyone&apos;s in today." />}
+              </Widget>
+            )}
           </div>
           </>
         )

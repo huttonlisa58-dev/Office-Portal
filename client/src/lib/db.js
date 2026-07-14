@@ -52,7 +52,7 @@ export async function getMe() {
   }
   if (profile?.company_id) {
     const { data: c } = await supabase.from('companies').select('*').eq('id', profile.company_id).single();
-    company = c && { ...mCompany(c), logo: c.logo || null, address: c.address || null, timezone: c.timezone, workSettings: { workdayStart: c.workday_start, lateAfterMinutes: c.late_after_minutes, fullDayHours: c.full_day_hours } };
+    company = c && { ...mCompany(c), logo: c.logo || null, address: c.address || null, timezone: c.timezone, workSettings: { workdayStart: c.workday_start, lateAfterMinutes: c.late_after_minutes, fullDayHours: c.full_day_hours, staffSeePeopleWidgets: c.staff_see_people_widgets !== false } };
   }
   return {
     user: { id: user.id, name: profile?.full_name, email: profile?.email, role: profile?.role, employee: profile?.employee_id, employeeCode, company: profile?.company_id },
@@ -977,6 +977,12 @@ function nextBirthday(dob) {
 export const home = {
   async widgets(profile) {
     const today = new Date(); const todayStr = today.toISOString().slice(0, 10);
+    const isManager = ['COMPANY_ADMIN', 'HR', 'MANAGER', 'SUPER_ADMIN'].includes(profile?.role);
+    let showPeopleWidgets = true;
+    if (profile?.company_id && !isManager) {
+      const { data: co } = await supabase.from('companies').select('staff_see_people_widgets').eq('id', profile.company_id).maybeSingle();
+      showPeopleWidgets = co?.staff_see_people_widgets !== false;
+    }
     const [{ data: emps }, { data: onLeave }, hol] = await Promise.all([
       supabase.from('employees')
         .select('id,first_name,last_name,employee_code,dob,date_of_joining,department_id,designation:designations(title)')
@@ -1026,7 +1032,7 @@ export const home = {
       if (bal) leaveBalance = { CASUAL: bal.casual, SICK: bal.sick, EARNED: bal.earned };
     }
 
-    return { newJoiners, departmentMembers, birthdays, peopleOnLeave, holidays: hol, leaveBalance, headcount: list.length };
+    return { newJoiners, departmentMembers, birthdays, peopleOnLeave, holidays: hol, leaveBalance, headcount: list.length, showPeopleWidgets };
   },
 };
 

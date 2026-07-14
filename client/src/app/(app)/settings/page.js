@@ -24,7 +24,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [newDept, setNewDept] = useState('');
   const [newDesig, setNewDesig] = useState('');
-  const [work, setWork] = useState({ workdayStart: '09:00', lateAfterMinutes: 15, fullDayHours: 8 });
+  const [work, setWork] = useState({ workdayStart: '09:00', lateAfterMinutes: 15, fullDayHours: 8, staffSeePeopleWidgets: true });
   const [savedMsg, setSavedMsg] = useState('');
   const savedTimer = useRef(null);
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
@@ -105,6 +105,7 @@ export default function SettingsPage() {
       workday_start: work.workdayStart,
       late_after_minutes: Number(work.lateAfterMinutes),
       full_day_hours: Number(work.fullDayHours),
+      staff_see_people_widgets: !!work.staffSeePeopleWidgets,
     }).eq('id', companyId);
     if (error) { setSavedMsg(error.message); return; }
     setSavedMsg('Work settings saved.'); refresh?.();
@@ -129,6 +130,10 @@ export default function SettingsPage() {
             <div><label className="label">Workday start</label><input className="input" type="time" value={work.workdayStart} onChange={(e) => setWork((w) => ({ ...w, workdayStart: e.target.value }))} /></div>
             <div><label className="label">Late grace (minutes)</label><input className="input" type="number" value={work.lateAfterMinutes} onChange={(e) => setWork((w) => ({ ...w, lateAfterMinutes: e.target.value }))} /></div>
             <div><label className="label">Full day (hours)</label><input className="input" type="number" value={work.fullDayHours} onChange={(e) => setWork((w) => ({ ...w, fullDayHours: e.target.value }))} /></div>
+            <label className="col-span-full flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <input type="checkbox" className="h-4 w-4" checked={work.staffSeePeopleWidgets} onChange={(e) => setWork((w) => ({ ...w, staffSeePeopleWidgets: e.target.checked }))} />
+              Show people widgets (birthdays, new joiners, people on leave) to all staff on their dashboard. Managers &amp; HR always see them.
+            </label>
           </div>
           <div className="mt-4 flex items-center gap-3">
             <button className="btn-primary" onClick={saveWork}>Save work settings</button>
