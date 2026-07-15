@@ -69,8 +69,6 @@ function DayDetailModal({ employeeId, companyId, date, user, onClose, onChanged,
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [shift, setShift] = useState(null);
-  const [weeklyOff, setWeeklyOff] = useState(null);
-  const [holidayMap, setHolidayMap] = useState({});
   const [menuOpen, setMenuOpen] = useState(false);
   const [addInit, setAddInit] = useState(null); // null = closed
   const [notice, setNotice] = useState('');
@@ -82,13 +80,7 @@ function DayDetailModal({ employeeId, companyId, date, user, onClose, onChanged,
     return punch.forDate(employeeId, date).then((p) => setPunches(p)).catch(() => {}).finally(() => setLoading(false));
   }, [employeeId, date]);
   useEffect(() => { reload(); }, [reload]);
-  useEffect(() => { shiftApi.mine(employeeId).then((r) => { setShift(r.shift); setWeeklyOff(r.weeklyOff); }).catch(() => {}); }, [employeeId]);
-  useEffect(() => {
-    holApi.all().then((hs) => {
-      const m = {}; (hs || []).forEach((h) => { m[h.date] = h.name; });
-      setHolidayMap(m);
-    }).catch(() => {});
-  }, []);
+  useEffect(() => { shiftApi.mine(employeeId).then((r) => setShift(r.shift)).catch(() => {}); }, [employeeId]);
 
   const nowMs = isToday ? Date.now() : (punches.length ? new Date(punches[punches.length - 1].at).getTime() : Date.now());
   const day = computeDay(punches, nowMs);
@@ -208,6 +200,16 @@ export default function MyAttendance({ employeeId }) {
   const [pendingDates, setPendingDates] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [dayModal, setDayModal] = useState(null);
+  // Used to flag days worked on a weekly-off or a public holiday in the history table.
+  const [weeklyOff, setWeeklyOff] = useState(null);
+  const [holidayMap, setHolidayMap] = useState({});
+  useEffect(() => { if (employeeId) shiftApi.mine(employeeId).then((r) => setWeeklyOff(r.weeklyOff)).catch(() => {}); }, [employeeId]);
+  useEffect(() => {
+    holApi.all().then((hs) => {
+      const m = {}; (hs || []).forEach((h) => { m[h.date] = h.name; });
+      setHolidayMap(m);
+    }).catch(() => {});
+  }, []);
 
   const load = useCallback(() => {
     if (!employeeId) { setLoading(false); return; }
