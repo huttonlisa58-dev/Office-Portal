@@ -942,7 +942,7 @@ export const callLogs = {
 export const notifications = {
   async list() {
     const { data } = await supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(50);
-    const items = (data || []).map((n) => ({ _id: n.id, title: n.title, body: n.body, isRead: n.is_read, createdAt: n.created_at }));
+    const items = (data || []).map((n) => ({ _id: n.id, type: n.type, title: n.title, body: n.body, isRead: n.is_read, createdAt: n.created_at }));
     return { items, unread: items.filter((i) => !i.isRead).length };
   },
   markAllRead: async () => { await supabase.from('notifications').update({ is_read: true }).eq('is_read', false); },
