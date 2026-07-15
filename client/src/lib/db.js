@@ -948,6 +948,42 @@ export const notifications = {
   markAllRead: async () => { await supabase.from('notifications').update({ is_read: true }).eq('is_read', false); },
 };
 
+// ---------- overtime policies ----------
+const mOtPolicy = (p) => ({
+  _id: p.id, name: p.name, priority: p.priority, scopeType: p.scope_type, scopeId: p.scope_id,
+  minMinutes: p.min_minutes, dailyThresholdMinutes: p.daily_threshold_minutes,
+  rateMultiplier: Number(p.rate_multiplier), maxHoursPerMonth: p.max_hours_per_month == null ? null : Number(p.max_hours_per_month),
+  compOffInstead: !!p.comp_off_instead, isActive: !!p.is_active,
+});
+export const overtimePolicies = {
+  async list() {
+    const { data, error } = await supabase.from('overtime_policies').select('*').order('priority').order('created_at');
+    if (error) throw new Error(error.message);
+    return (data || []).map(mOtPolicy);
+  },
+  async save(companyId, p) {
+    const row = {
+      company_id: companyId, name: p.name, priority: Number(p.priority) || 100,
+      scope_type: p.scopeType || 'ALL', scope_id: p.scopeType && p.scopeType !== 'ALL' ? (p.scopeId || null) : null,
+      min_minutes: Number(p.minMinutes) || 0,
+      daily_threshold_minutes: p.dailyThresholdMinutes === '' || p.dailyThresholdMinutes == null ? null : Number(p.dailyThresholdMinutes),
+      rate_multiplier: Number(p.rateMultiplier) || 1.5,
+      max_hours_per_month: p.maxHoursPerMonth === '' || p.maxHoursPerMonth == null ? null : Number(p.maxHoursPerMonth),
+      comp_off_instead: !!p.compOffInstead, is_active: p.isActive !== false,
+    };
+    if (p._id) { const { error } = await supabase.from('overtime_policies').update(row).eq('id', p._id); if (error) throw new Error(error.message); }
+    else { const { error } = await supabase.from('overtime_policies').insert(row); if (error) throw new Error(error.message); }
+  },
+  async remove(id) { const { error } = await supabase.from('overtime_policies').delete().eq('id', id); if (error) throw new Error(error.message); },
+  async setPriority(id, priority) { const { error } = await supabase.from('overtime_policies').update({ priority }).eq('id', id); if (error) throw new Error(error.message); },
+  // per-day worked/OT minutes straight from punch data
+  async forEmployee(employeeId, from, to) {
+    const { data, error } = await supabase.rpc('employee_overtime', { p_employee_id: employeeId, p_from: from, p_to: to });
+    if (error) throw new Error(error.message);
+    return (data || []).map((r) => ({ date: r.work_date, workedMinutes: r.worked_minutes, otMinutes: r.ot_minutes }));
+  },
+};
+
 // ---------- holidays ----------
 export const holidays = {
   async all() {

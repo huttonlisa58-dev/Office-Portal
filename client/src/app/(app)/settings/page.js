@@ -1,10 +1,10 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Building2, Layers, Briefcase, Clock, Trash2, Plus, Users, CalendarClock } from 'lucide-react';
+import { Building2, Layers, Briefcase, Clock, Trash2, Plus, Users, CalendarClock, Timer, ArrowUp, ArrowDown } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import Loader from '@/components/Loader';
 import { useAuth } from '@/context/AuthContext';
-import { org, shifts as shiftApi, employees as empApi, leavePolicies as lpApi, leaves as leaveApi } from '@/lib/db';
+import { org, shifts as shiftApi, employees as empApi, leavePolicies as lpApi, leaves as leaveApi, overtimePolicies as otApi } from '@/lib/db';
 import { supabase } from '@/lib/supabaseClient';
 
 const WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -29,11 +29,54 @@ export default function SettingsPage() {
   const savedTimer = useRef(null);
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
 
+  // ---- overtime policies ----
+  const [otRows, setOtRows] = useState([]);
+  const [otBusy, setOtBusy] = useState(false);
+  const [otMsg, setOtMsg] = useState('');
+  const setOtField = (i, k) => (e) => {
+    const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setOtRows((rows) => rows.map((r, idx) => {
+      if (idx !== i) return r;
+      const next = { ...r, [k]: v };
+      if (k === 'scopeType' && v === 'ALL') next.scopeId = null;
+      return next;
+    }));
+  };
+  const addOt = () => setOtRows((rows) => [...rows, { name: '', priority: (rows.length + 1) * 10, scopeType: 'ALL', scopeId: null, minMinutes: 30, dailyThresholdMinutes: '', rateMultiplier: 1.5, maxHoursPerMonth: '', compOffInstead: false, isActive: true }]);
+  const removeOt = async (i) => {
+    const row = otRows[i];
+    if (row._id && !window.confirm(`Delete the "${row.name || 'untitled'}" overtime policy?`)) return;
+    if (row._id) { try { await otApi.remove(row._id); } catch (e) { setOtMsg(e.message); return; } }
+    setOtRows((rows) => rows.filter((_, idx) => idx !== i));
+  };
+  const moveOt = (i, dir) => setOtRows((rows) => {
+    const next = [...rows]; const j = i + dir;
+    if (j < 0 || j >= next.length) return rows;
+    [next[i], next[j]] = [next[j], next[i]];
+    return next;
+  });
+  const saveOt = async () => {
+    setOtMsg('');
+    for (const r of otRows) {
+      if (!String(r.name || '').trim()) { setOtMsg('Give every overtime policy a name.'); return; }
+      if (r.scopeType !== 'ALL' && !r.scopeId) { setOtMsg(`"${r.name}": pick who the policy applies to.`); return; }
+      if (!(Number(r.rateMultiplier) > 0)) { setOtMsg(`"${r.name}": rate multiplier must be greater than 0.`); return; }
+    }
+    setOtBusy(true);
+    try {
+      // list order IS the priority order
+      for (let i = 0; i < otRows.length; i++) await otApi.save(company.id, { ...otRows[i], priority: (i + 1) * 10 });
+      const fresh = await otApi.list();
+      setOtRows(fresh);
+      setOtMsg('Overtime policies saved.');
+    } catch (e) { setOtMsg(e.message || 'Save failed'); } finally { setOtBusy(false); }
+  };
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [d, g, sh, em, lps] = await Promise.all([org.departments(), org.designations(), shiftApi.listAll(), empApi.all().catch(() => []), lpApi.list().catch(() => [])]);
-      setDepts(d); setDesigs(g); setShiftList(sh); setEmpList(em || []);
+      const [d, g, sh, em, lps, ots] = await Promise.all([org.departments(), org.designations(), shiftApi.listAll(), empApi.all().catch(() => []), lpApi.list().catch(() => []), otApi.list().catch(() => [])]);
+      setDepts(d); setDesigs(g); setShiftList(sh); setEmpList(em || []); setOtRows(ots || []);
       const pm = {};
       (lps || []).forEach((p) => { pm[p.leaveType] = { annualQuota: p.annualQuota, accrualPerMonth: p.accrualPerMonth, eligibilityMonths: p.eligibilityMonths, carryForwardCap: p.carryForwardCap ?? '', reasonRequiredDays: p.reasonRequiredDays ?? '', expiryMode: p.expiryMode || 'NONE', expiryDay: p.expiryDay || '' }; });
       ['EARNED', 'SICK', 'CASUAL'].forEach((t) => { if (!pm[t]) pm[t] = { annualQuota: 0, accrualPerMonth: 0, eligibilityMonths: 0, carryForwardCap: '', reasonRequiredDays: '', expiryMode: 'NONE', expiryDay: '' }; });
@@ -253,6 +296,75 @@ export default function SettingsPage() {
             {polMsg && <span className="text-sm text-emerald-600">{polMsg}</span>}
           </div>
           <p className="mt-2 text-xs text-slate-400">Carry-forward also runs automatically on Jan 1. Leave the cap blank to disable carry-forward for a type.</p>
+        </div>
+
+        {/* ---- Overtime policies ---- */}
+        <div className="card p-5 lg:col-span-2">
+          <div className="mb-1 flex items-center gap-2"><Timer size={18} className="text-brand-600" /><span className="font-semibold">Overtime policies</span></div>
+          <p className="mb-3 text-xs text-slate-400">Overtime is measured from real check-in/out punches. When more than one policy matches an employee, the one highest in this list wins.</p>
+          {otMsg && <div className="mb-3 text-sm text-emerald-600">{otMsg}</div>}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[52rem] text-sm">
+              <thead className="text-left text-xs uppercase text-slate-400">
+                <tr>
+                  <th className="py-2 pr-2 font-medium">Order</th>
+                  <th className="py-2 pr-4 font-medium">Name</th>
+                  <th className="py-2 pr-4 font-medium">Applies to</th>
+                  <th className="py-2 pr-4 font-medium">Counts after</th>
+                  <th className="py-2 pr-4 font-medium">Min OT (min)</th>
+                  <th className="py-2 pr-4 font-medium">Rate</th>
+                  <th className="py-2 pr-4 font-medium">Monthly cap (h)</th>
+                  <th className="py-2 pr-4 font-medium">Comp-off</th>
+                  <th className="py-2 pr-4 font-medium">Active</th>
+                  <th className="py-2 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {otRows.length === 0 && <tr><td colSpan={10} className="py-6 text-center text-slate-400">No overtime policies yet. Add one to start paying or banking overtime.</td></tr>}
+                {otRows.map((r, i) => (
+                  <tr key={r._id || `new-${i}`} className="border-t dark:border-slate-700">
+                    <td className="py-2 pr-2">
+                      <div className="flex items-center gap-0.5">
+                        <button className="btn-ghost p-1 disabled:opacity-30" disabled={i === 0} onClick={() => moveOt(i, -1)} title="Higher priority"><ArrowUp size={13} /></button>
+                        <button className="btn-ghost p-1 disabled:opacity-30" disabled={i === otRows.length - 1} onClick={() => moveOt(i, 1)} title="Lower priority"><ArrowDown size={13} /></button>
+                      </div>
+                    </td>
+                    <td className="py-2 pr-4"><input className="input w-36" value={r.name} onChange={setOtField(i, 'name')} placeholder="e.g. Standard OT" /></td>
+                    <td className="py-2 pr-4">
+                      <div className="flex items-center gap-1">
+                        <select className="input w-28" value={r.scopeType} onChange={setOtField(i, 'scopeType')}>
+                          <option value="ALL">Everyone</option>
+                          <option value="DEPARTMENT">Department</option>
+                          <option value="DESIGNATION">Designation</option>
+                          <option value="EMPLOYEE">Employee</option>
+                        </select>
+                        {r.scopeType !== 'ALL' && (
+                          <select className="input w-36" value={r.scopeId || ''} onChange={setOtField(i, 'scopeId')}>
+                            <option value="">— pick —</option>
+                            {(r.scopeType === 'DEPARTMENT' ? depts.map((d) => [d._id, d.name])
+                              : r.scopeType === 'DESIGNATION' ? desigs.map((d) => [d._id, d.title])
+                              : empList.map((e) => [e._id, `${e.firstName} ${e.lastName || ''}`.trim()])
+                            ).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+                          </select>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-2 pr-4"><input type="number" min="1" max="1440" className="input w-28" placeholder="shift length" value={r.dailyThresholdMinutes ?? ''} onChange={setOtField(i, 'dailyThresholdMinutes')} title="Minutes worked in a day before overtime starts. Blank = the employee's shift length." /></td>
+                    <td className="py-2 pr-4"><input type="number" min="0" className="input w-20" value={r.minMinutes ?? 0} onChange={setOtField(i, 'minMinutes')} title="Ignore overtime shorter than this" /></td>
+                    <td className="py-2 pr-4"><input type="number" step="0.1" min="0.1" max="10" className="input w-20" value={r.rateMultiplier} onChange={setOtField(i, 'rateMultiplier')} title="Multiplier on the hourly rate" /></td>
+                    <td className="py-2 pr-4"><input type="number" min="0" step="0.5" className="input w-20" placeholder="none" value={r.maxHoursPerMonth ?? ''} onChange={setOtField(i, 'maxHoursPerMonth')} /></td>
+                    <td className="py-2 pr-4"><input type="checkbox" className="h-4 w-4" checked={!!r.compOffInstead} onChange={setOtField(i, 'compOffInstead')} title="Give comp-off instead of paying" /></td>
+                    <td className="py-2 pr-4"><input type="checkbox" className="h-4 w-4" checked={r.isActive !== false} onChange={setOtField(i, 'isActive')} /></td>
+                    <td className="py-2"><button className="btn-ghost p-1.5 text-rose-500" onClick={() => removeOt(i)} title="Delete policy"><Trash2 size={15} /></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button className="btn-outline" onClick={addOt}><Plus size={15} /> Add policy</button>
+            <button className="btn-primary disabled:opacity-60" disabled={otBusy} onClick={saveOt}>{otBusy ? 'Saving…' : 'Save overtime policies'}</button>
+          </div>
         </div>
 
         <div className="card p-5 lg:col-span-2">
