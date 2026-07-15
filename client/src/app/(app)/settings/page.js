@@ -57,6 +57,7 @@ export default function SettingsPage() {
   });
   const saveOt = async () => {
     setOtMsg('');
+    if (!companyId) { setOtMsg('No company context'); return; }
     for (const r of otRows) {
       if (!String(r.name || '').trim()) { setOtMsg('Give every overtime policy a name.'); return; }
       if (r.scopeType !== 'ALL' && !r.scopeId) { setOtMsg(`"${r.name}": pick who the policy applies to.`); return; }
@@ -65,7 +66,7 @@ export default function SettingsPage() {
     setOtBusy(true);
     try {
       // list order IS the priority order
-      for (let i = 0; i < otRows.length; i++) await otApi.save(company.id, { ...otRows[i], priority: (i + 1) * 10 });
+      for (let i = 0; i < otRows.length; i++) await otApi.save(companyId, { ...otRows[i], priority: (i + 1) * 10 });
       const fresh = await otApi.list();
       setOtRows(fresh);
       setOtMsg('Overtime policies saved.');
@@ -115,7 +116,7 @@ export default function SettingsPage() {
 
   const setPolField = (type, key) => (e) => { const v = e.target.value; setPol((p) => ({ ...p, [type]: { ...p[type], [key]: v } })); setPolMsg(''); };
   const savePolicies = async () => {
-    if (!company?.id) { setPolMsg('No company context'); return; }
+    if (!companyId) { setPolMsg('No company context'); return; }
     setPolBusy(true); setPolMsg('');
     try {
       for (const t of ['EARNED', 'SICK', 'CASUAL']) {
@@ -126,7 +127,7 @@ export default function SettingsPage() {
       }
       for (const t of ['EARNED', 'SICK', 'CASUAL']) {
         const row = pol[t] || {};
-        await lpApi.upsert(company.id, t, {
+        await lpApi.upsert(companyId, t, {
           annualQuota: Number(row.annualQuota) || 0,
           accrualPerMonth: Number(row.accrualPerMonth) || 0,
           eligibilityMonths: Number(row.eligibilityMonths) || 0,
