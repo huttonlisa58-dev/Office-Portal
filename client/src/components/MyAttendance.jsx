@@ -1,9 +1,10 @@
 'use client';
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Turtle, Hand, Flame, X, Monitor, MapPin, Trash2, Plus, ChevronDown } from 'lucide-react';
-import { attendance as attApi, punch, computeDay, shifts as shiftApi, attendanceReq } from '@/lib/db';
+import { attendance as attApi, punch, computeDay, shifts as shiftApi, attendanceReq, holidays as holApi } from '@/lib/db';
 import { useAuth } from '@/context/AuthContext';
 import Loader from '@/components/Loader';
+import { cls } from '@/lib/format';
 
 const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WDF = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -68,6 +69,8 @@ function DayDetailModal({ employeeId, companyId, date, user, onClose, onChanged,
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [shift, setShift] = useState(null);
+  const [weeklyOff, setWeeklyOff] = useState(null);
+  const [holidayMap, setHolidayMap] = useState({});
   const [menuOpen, setMenuOpen] = useState(false);
   const [addInit, setAddInit] = useState(null); // null = closed
   const [notice, setNotice] = useState('');
@@ -79,7 +82,13 @@ function DayDetailModal({ employeeId, companyId, date, user, onClose, onChanged,
     return punch.forDate(employeeId, date).then((p) => setPunches(p)).catch(() => {}).finally(() => setLoading(false));
   }, [employeeId, date]);
   useEffect(() => { reload(); }, [reload]);
-  useEffect(() => { shiftApi.mine(employeeId).then((r) => setShift(r.shift)).catch(() => {}); }, [employeeId]);
+  useEffect(() => { shiftApi.mine(employeeId).then((r) => { setShift(r.shift); setWeeklyOff(r.weeklyOff); }).catch(() => {}); }, [employeeId]);
+  useEffect(() => {
+    holApi.all().then((hs) => {
+      const m = {}; (hs || []).forEach((h) => { m[h.date] = h.name; });
+      setHolidayMap(m);
+    }).catch(() => {});
+  }, []);
 
   const nowMs = isToday ? Date.now() : (punches.length ? new Date(punches[punches.length - 1].at).getTime() : Date.now());
   const day = computeDay(punches, nowMs);
@@ -266,8 +275,14 @@ export default function MyAttendance({ employeeId }) {
   }, [data, days, year, month, todayStr, punchStats, pendingDates]);
 
   const firstLast = useMemo(() => Object.entries(punchStats)
-    .map(([date, st]) => ({ date, first: st.first, last: st.last, total: st.workMin, spansMidnight: st.spansMidnight }))
-    .sort((a, b) => b.date.localeCompare(a.date)), [punchStats]);
+    .map(([date, st]) => {
+      // Working on a weekly-off or a holiday matters (comp-off / OT eligibility), so surface it.
+      const dow = new Date(`${date}T00:00:00`).getDay();
+      const onDayOff = weeklyOff != null && dow === Number(weeklyOff);
+      const holidayName = holidayMap[date] || null;
+      return { date, first: st.first, last: st.last, total: st.workMin, spansMidnight: st.spansMidnight, onDayOff, holidayName };
+    })
+    .sort((a, b) => b.date.localeCompare(a.date)), [punchStats, weeklyOff, holidayMap]);
 
   const go = (delta) => { let m = month + delta, y = year; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } setMonth(m); setYear(y); };
 
@@ -326,8 +341,12 @@ export default function MyAttendance({ employeeId }) {
             <tbody>
               {firstLast.length === 0 && <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-400">No punches this month.</td></tr>}
               {firstLast.map((r) => (
-                <tr key={r.date} className="border-b last:border-0">
-                  <td className="px-5 py-3 font-medium">{new Date(r.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                <tr key={r.date} className={cls('border-b last:border-0', (r.onDayOff || r.holidayName) && 'bg-amber-50/60 dark:bg-amber-950/20')}>
+                  <td className="px-5 py-3 font-medium">
+                    {new Date(r.date).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {r.holidayName && <span className="ml-1.5 rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-950/50 dark:text-violet-300" title={`Worked on a holiday: ${r.holidayName}`}>Holiday</span>}
+                    {r.onDayOff && !r.holidayName && <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" title="Worked on your weekly off">Day off</span>}
+                  </td>
                   <td className="px-5 py-3 text-slate-500">{fmtTime(r.first)}</td>
                   <td className="px-5 py-3 text-slate-500">{fmtTime(r.last)}{r.spansMidnight && <span className="ml-1 rounded bg-slate-100 px-1 text-[10px] font-medium text-slate-500 dark:bg-slate-700" title="Checked out after midnight (next day)">+1d</span>}</td>
                   <td className="px-5 py-3 text-slate-500">{fmtDur(r.total)}</td>
