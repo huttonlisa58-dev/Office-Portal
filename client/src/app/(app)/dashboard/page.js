@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Building2, Users, UserCog, Cake, UserPlus, CalendarDays, Plane, UserMinus, GripVertical, Rss, LayoutGrid, Megaphone, UserCheck, DollarSign,
+  Building2, Users, UserCog, Cake, UserPlus, CalendarDays, Plane, UserMinus, GripVertical, Rss, LayoutGrid, Megaphone, UserCheck, DollarSign, Award,
 } from 'lucide-react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Legend, Tooltip } from 'recharts';
 import StatCard from '@/components/StatCard';
@@ -124,6 +124,14 @@ function Company({ name, profile }) {
             {data.showPeopleWidgets && (
               <Widget icon={Cake} title="Birthday">
                 {data.birthdays.length ? data.birthdays.map((p, i) => <Person key={p.id} i={i} id={p.id} name={p.name} sub={p.role} meta={fmtDate(p.date)} />) : <Empty text="No upcoming birthdays." />}
+              </Widget>
+            )}
+
+            {data.showPeopleWidgets && (
+              <Widget icon={Award} title="Work anniversaries">
+                {data.anniversaries?.length
+                  ? data.anniversaries.map((p, i) => <Person key={p.id} i={i} id={p.id} name={p.name} sub={p.role} meta={`${p.years} yr${p.years > 1 ? 's' : ''} · ${fmtDate(p.date)}`} />)
+                  : <Empty text="No upcoming work anniversaries." />}
               </Widget>
             )}
 

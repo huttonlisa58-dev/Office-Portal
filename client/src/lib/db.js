@@ -1015,6 +1015,17 @@ function nextBirthday(dob) {
   if (next < new Date(now.getFullYear(), now.getMonth(), now.getDate())) next.setFullYear(now.getFullYear() + 1);
   return next;
 }
+// Years completed on the upcoming anniversary of a joining date.
+function nextAnniversary(doj) {
+  if (!doj) return null;
+  const d = new Date(doj); const now = new Date();
+  const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const next = new Date(now.getFullYear(), d.getMonth(), d.getDate());
+  if (next < todayMidnight) next.setFullYear(now.getFullYear() + 1);
+  const years = next.getFullYear() - d.getFullYear();
+  if (years < 1) return null; // still in their first year — they show under New joiners
+  return { date: next, years };
+}
 export const home = {
   async widgets(profile) {
     const today = new Date(); const todayStr = today.toISOString().slice(0, 10);
@@ -1058,6 +1069,13 @@ export const home = {
       .sort((a, b) => a.nb - b.nb)
       .map(({ e, nb }) => ({ id: e.id, name: name(e), role: role(e), date: nb.toISOString().slice(0, 10) }));
 
+    // Work anniversaries (next 45 days) — same horizon as birthdays
+    const anniversaries = list
+      .map((e) => ({ e, na: nextAnniversary(e.date_of_joining) }))
+      .filter((x) => x.na && x.na.date <= horizon)
+      .sort((a, b) => a.na.date - b.na.date)
+      .map(({ e, na }) => ({ id: e.id, name: name(e), role: role(e), date: na.date.toISOString().slice(0, 10), years: na.years }));
+
     // People on leave today
     const peopleOnLeave = (onLeave || []).map((l) => ({
       name: `${l.employee?.first_name || ''} ${l.employee?.last_name || ''}`.trim(),
@@ -1073,7 +1091,7 @@ export const home = {
       if (bal) leaveBalance = { CASUAL: bal.casual, SICK: bal.sick, EARNED: bal.earned };
     }
 
-    return { newJoiners, departmentMembers, birthdays, peopleOnLeave, holidays: hol, leaveBalance, headcount: list.length, showPeopleWidgets };
+    return { newJoiners, departmentMembers, birthdays, anniversaries, peopleOnLeave, holidays: hol, leaveBalance, headcount: list.length, showPeopleWidgets };
   },
 };
 
