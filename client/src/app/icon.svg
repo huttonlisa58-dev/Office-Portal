@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="HRMS">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3366ff"/>
+      <stop offset="1" stop-color="#1838e1"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <circle cx="32" cy="23" r="9" fill="#ffffff"/>
+  <path d="M32 35c-9.6 0-17.5 5.9-17.5 13.2V52h35v-3.8C49.5 40.9 41.6 35 32 35Z" fill="#ffffff"/>
+</svg>
