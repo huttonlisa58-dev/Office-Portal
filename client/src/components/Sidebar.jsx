@@ -77,6 +77,8 @@ export default function Sidebar({ open, onClose }) {
   const initialOpen = {};
   items.forEach((n, i) => { if (n.children?.some((c) => isActive(pathname, c.href))) initialOpen[i] = true; });
   const [openGroups, setOpenGroups] = useState(initialOpen);
+  // A logo URL can rot (external host, expired link) — fall back to the initial instead of a broken image.
+  const [logoBroken, setLogoBroken] = useState(false);
   const toggle = (i) => setOpenGroups((s) => ({ ...s, [i]: !s[i] }));
 
   return (
@@ -88,9 +90,9 @@ export default function Sidebar({ open, onClose }) {
       )}>
         <div className="flex items-start justify-between gap-2 px-4 py-4">
           <Link href="/dashboard" className="flex items-start gap-2.5">
-            {company?.logo ? (
+            {company?.logo && !logoBroken ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={company.logo} alt={company?.name || 'Company'} className="h-9 w-9 shrink-0 rounded-lg bg-white object-contain p-0.5" />
+              <img src={company.logo} alt={company?.name || 'Company'} className="h-9 w-9 shrink-0 rounded-lg bg-white object-contain p-0.5" onError={() => setLogoBroken(true)} />
             ) : (
               <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-sm font-extrabold text-brand-600">{company?.name ? company.name[0] : 'H'}</div>
             )}

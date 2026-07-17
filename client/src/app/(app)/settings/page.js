@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Building2, Layers, Briefcase, Clock, Trash2, Plus, Users, CalendarClock, Timer, ArrowUp, ArrowDown } from 'lucide-react';
+import { Building2, Layers, Briefcase, Clock, Trash2, Plus, Users, CalendarClock, Timer, ArrowUp, ArrowDown, Image as ImageIcon, Upload } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import Loader from '@/components/Loader';
 import { useAuth } from '@/context/AuthContext';
@@ -86,6 +86,7 @@ export default function SettingsPage() {
   }, []);
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (company?.workSettings) setWork((w) => ({ ...w, ...company.workSettings })); }, [company]);
+  useEffect(() => { if (company) { setBrand({ logo: company.logo || '', address: company.address || '' }); setLogoBroken(false); } }, [company]);
 
   const addDept = async () => { if (!newDept || !companyId) return; await org.addDepartment(companyId, newDept); setNewDept(''); load(); };
   const delDept = async (id) => { await org.delDepartment(id); load(); };
@@ -151,6 +152,41 @@ export default function SettingsPage() {
     } catch (e) { setPolMsg(e.message || 'Carry-forward failed'); } finally { setCfBusy(false); }
   };
 
+  // ---- company branding (logo + address shown in the sidebar and on payslips) ----
+  const [brand, setBrand] = useState({ logo: '', address: '' });
+  const [brandBusy, setBrandBusy] = useState(false);
+  const [brandMsg, setBrandMsg] = useState('');
+  const [logoBroken, setLogoBroken] = useState(false);
+
+  const uploadLogo = async (file) => {
+    if (!file || !companyId) return;
+    if (!file.type.startsWith('image/')) { setBrandMsg('Pick an image file (PNG, JPG, WEBP or SVG).'); return; }
+    if (file.size > 2 * 1024 * 1024) { setBrandMsg('Logo must be smaller than 2 MB.'); return; }
+    setBrandBusy(true); setBrandMsg('');
+    try {
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+      const path = `${companyId}/logo-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('branding').upload(path, file, { upsert: true, contentType: file.type });
+      if (upErr) throw new Error(upErr.message);
+      const { data: pub } = supabase.storage.from('branding').getPublicUrl(path);
+      setBrand((b) => ({ ...b, logo: pub.publicUrl }));
+      setLogoBroken(false);
+      setBrandMsg('Logo uploaded — remember to save.');
+    } catch (e) { setBrandMsg(e.message || 'Upload failed'); } finally { setBrandBusy(false); }
+  };
+
+  const saveBrand = async () => {
+    if (!companyId) { setBrandMsg('No company context'); return; }
+    setBrandBusy(true); setBrandMsg('');
+    const { error } = await supabase.from('companies').update({
+      logo: brand.logo?.trim() ? brand.logo.trim() : null,
+      address: brand.address?.trim() ? brand.address.trim() : null,
+    }).eq('id', companyId);
+    setBrandBusy(false);
+    if (error) { setBrandMsg(error.message); return; }
+    setBrandMsg('Branding saved.'); refresh?.();
+  };
+
   const saveWork = async () => {
     if (!companyId) return;
     const { error } = await supabase.from('companies').update({
@@ -171,6 +207,45 @@ export default function SettingsPage() {
     <>
       <PageHeader title="Settings" subtitle="Organization structure and work policies" />
       <div className="grid gap-6 lg:grid-cols-2">
+        {/* ---- Company branding ---- */}
+        <div className="card p-5 lg:col-span-2">
+          <div className="mb-1 flex items-center gap-2"><ImageIcon size={18} className="text-brand-600" /><span className="font-semibold">Company branding</span></div>
+          <p className="mb-4 text-xs text-slate-400">Your logo and address appear in the sidebar and on printed payslips.</p>
+          {brandMsg && <div className="mb-3 text-sm text-emerald-600">{brandMsg}</div>}
+          <div className="flex flex-wrap items-start gap-5">
+            <div className="shrink-0">
+              <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-xl border bg-white dark:border-slate-700">
+                {brand.logo && !logoBroken ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={brand.logo} alt="Company logo" className="h-full w-full object-contain p-1" onError={() => setLogoBroken(true)} />
+                ) : (
+                  <span className="text-2xl font-extrabold text-brand-600">{company?.name ? company.name[0] : 'H'}</span>
+                )}
+              </div>
+              {brand.logo && logoBroken && <p className="mt-1 w-20 text-[10px] leading-tight text-rose-500">Image didn&apos;t load</p>}
+            </div>
+            <div className="min-w-[16rem] flex-1 space-y-3">
+              <div>
+                <label className="label">Logo</label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <label className="btn-outline cursor-pointer">
+                    <Upload size={15} /> {brandBusy ? 'Uploading…' : 'Upload image'}
+                    <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" disabled={brandBusy}
+                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; uploadLogo(f); }} />
+                  </label>
+                  {brand.logo && <button className="btn-ghost text-rose-500" onClick={() => { setBrand((b) => ({ ...b, logo: '' })); setLogoBroken(false); }}><Trash2 size={15} /> Remove</button>}
+                </div>
+                <p className="mt-1 text-xs text-slate-400">PNG, JPG, WEBP or SVG, up to 2 MB. A square image works best.</p>
+              </div>
+              <div>
+                <label className="label">Address</label>
+                <textarea className="input min-h-[4.5rem]" placeholder="Registered address shown on payslips" value={brand.address} onChange={(e) => setBrand((b) => ({ ...b, address: e.target.value }))} />
+              </div>
+              <button className="btn-primary disabled:opacity-60" disabled={brandBusy} onClick={saveBrand}>{brandBusy ? 'Saving…' : 'Save branding'}</button>
+            </div>
+          </div>
+        </div>
+
         <ListCard icon={Layers} title="Departments" value={newDept} setValue={setNewDept} onAdd={addDept}
           items={depts.map((d) => ({ id: d._id, label: d.name }))} onDelete={delDept} placeholder="e.g. Engineering" />
         <ListCard icon={Briefcase} title="Designations" value={newDesig} setValue={setNewDesig} onAdd={addDesig}
